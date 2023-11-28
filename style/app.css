@@ -6,12 +6,26 @@ html, body {
 
 app {
     height: 100%;
-    display: flex;
-    background-image: url(../images/background.jpg);
-    background-position: center;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 4fr;
+    place-items: center;
+    background-image: url(../images/aa.jpg);
+    /* background-size: cover; */
+    background-position: right;
 }
 
-.logo {
-    max-width: 45%;
-    padding: 14px;
+.logo-container {
+    padding-top: 40px;
 }
+
+.logo-container img {
+    max-width: 400px;
+}
+
+@media screen and (max-width: 600px) {
+    .logo-container img {
+        max-width: 200px;
+    }
+}
+
