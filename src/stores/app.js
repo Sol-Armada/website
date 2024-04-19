@@ -49,32 +49,6 @@ export const useAppStore = defineStore('app', {
             console.log("LOGGING IN")
             const connectionStore = useConnectionStore()
 
-            // connectionStore.socket.addEventListener("message", (event) => {
-            //     const commandResponse = new CommandResponse(event.data)
-
-            //     if (commandResponse.error != '') {
-            //         if (commandResponse.error == 'invalid_grant') {
-            //             this.authCode = null
-            //             // clear the code from params
-            //             window.history.pushState({}, document.title, window.location.pathname)
-            //         }
-            //         return
-            //     }
-
-            //     if (commandResponse.thing === "login") {
-            //         this.loggedIn = true
-            //         this.accessToken = commandResponse.result.access_token
-
-            //         // store the token
-            //         localStorage.setItem("discord_access", JSON.stringify(commandResponse.result))
-
-            //         connectionStore.socket.send(`members|me:${this.accessToken}`)
-            //     }
-
-            //     if (commandResponse.thing === "me") {
-            //         this.me = new Member(commandResponse.result)
-            //     }
-            // })
             connectionStore.addListener("login", (commandResponse) => {
                 if (commandResponse.error != '') {
                     if (commandResponse.error == 'invalid_grant') {
@@ -100,16 +74,6 @@ export const useAppStore = defineStore('app', {
             }
 
             const connectionStore = useConnectionStore()
-
-            // connectionStore.socket.addEventListener("message", (event) => {
-            //     const commandResponse = new CommandResponse(event.data)
-
-            //     if (commandResponse.thing === "me") {
-            //         this.me = new Member(commandResponse.result)
-
-            //         localStorage.setItem("me", JSON.stringify(commandResponse.result))
-            //     }
-            // })
 
             connectionStore.addListener("me", (commandResponse) => {
                 const errorStore = useErrorStore()
