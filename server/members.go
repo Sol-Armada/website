@@ -21,7 +21,7 @@ var membersActions = map[string]Action{
 	"me":  getMe,
 }
 
-func getMe(c *Client, arg any) {
+func getMe(ctx context.Context, c *Client, token any) {
 	host := viper.GetString("MONGO.HOST")
 	port := viper.GetInt("MONGO.PORT")
 	database := viper.GetString("MONGO.DATABASE")
@@ -31,16 +31,17 @@ func getMe(c *Client, arg any) {
 	}
 
 	cr := CommandResponse{
-		Thing: "me",
+		Thing:  "members",
+		Action: "me",
 	}
 	defer func() {
 		j, _ := json.Marshal(cr)
 		c.send <- j
 	}()
 
-	token := arg.(string)
+	uAccess := ctx.Value(contextKeyAccess).(userAccess)
 
-	logger := slog.With("token", token)
+	logger := slog.With("token", uAccess.Token)
 	logger.Info("creating new user access")
 
 	redirectURI := viper.GetString("DISCORD.REDIRECT_URI")
@@ -58,7 +59,7 @@ func getMe(c *Client, arg any) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", uAccess.Token))
 
 	logger.Debug("req for @me to discord")
 
@@ -137,7 +138,9 @@ func getMe(c *Client, arg any) {
 	cr.Result = user
 }
 
-func getMembers(c *Client, arg any) {
+func getMembers(ctx context.Context, c *Client, arg any) {
+	uAccess := ctx.Value(contextKeyAccess).(userAccess)
+	_ = uAccess
 	members := []*users.User{
 		{
 			ID:   "1",

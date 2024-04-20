@@ -1,6 +1,7 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { CommandResponse } from "./classes"
 import { useErrorStore } from "./error"
+import { useAppStore } from "./app"
 
 // const URL = process.env.NODE_ENV === "production" ? import.meta.env.VITE_WEBSOCKET_URL : "ws://localhost:3001/ws"
 const URL = import.meta.env.VITE_WEBSOCKET_URL
@@ -8,6 +9,7 @@ const URL = import.meta.env.VITE_WEBSOCKET_URL
 export const useConnectionStore = defineStore("connection", () => {
     const isConnected = ref(false)
     const socket = ref(null)
+    const appStore = useAppStore()
 
     function bindEvents() {
         this.connect()
@@ -43,19 +45,23 @@ export const useConnectionStore = defineStore("connection", () => {
         }
     }
 
-    function send(command) {
+    function send(command, action, arg, attempts = 0) {
+        console.log(command + "|" + action + ":" + arg + ":" + useAppStore().token)
         let sent = false
-        for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-                if (isConnected.value && !sent) {
-                    socket.value.send(command)
-                    sent = true
-                }
-            }, 1000)
-            if (sent) {
-                break
-            }
+        if (isConnected.value) {
+            socket.value.send(command + "|" + action + ":" + arg + ":" + useAppStore().token)
+            sent = true
+            return
         }
+        setTimeout(() => {
+            if (sent) {
+                return
+            }
+
+            if (attempts < 5) {
+                send(command, action, arg, attempts + 1)
+            }
+        }, 1000)
     }
 
     function addListener(thing, callback) {
@@ -78,5 +84,5 @@ export const useConnectionStore = defineStore("connection", () => {
 })
 
 if (import.meta.hot) {
- import.meta.hot.accept(acceptHMRUpdate(useConnectionStore, import.meta.hot))
+    import.meta.hot.accept(acceptHMRUpdate(useConnectionStore, import.meta.hot))
 }

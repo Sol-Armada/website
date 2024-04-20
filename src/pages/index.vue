@@ -2,7 +2,7 @@
     <v-container fluid>
         <v-row>
             <v-col cols="12">
-                <v-card>
+                <v-card :class="'bg-surface-' + ld + '-1'">
                     <v-card-title>Home</v-card-title>
                 </v-card>
             </v-col>
@@ -11,6 +11,14 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+import { useTheme } from 'vuetify'
+
+const theme = useTheme()
+const ld = ref('darken')
+if (theme.current.value.dark) {
+    ld.value = 'lighten'
+}
 </script>
 <route lang="yaml">
 meta:
