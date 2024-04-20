@@ -2,103 +2,111 @@
 import { defineStore } from 'pinia'
 import { useConnectionStore } from './connection'
 import { useErrorStore } from './error'
-import { Member } from './classes'
+import { Member, CommandResponse } from './classes'
 
 export const useAppStore = defineStore('app', {
     state: () => ({
-        loggedIn: null,
+        loggedIn: false,
+        loggingIn: false,
         /** @type {string} */
-        authCode: null,
+        token: null,
         /** @type {string} */
-        accessToken: null,
-        /** @type {Member} */
         me: null
     }),
     actions: {
         bindEvents() {
-            const daStorage = localStorage.getItem("discord_access")
             const meStorage = localStorage.getItem("me")
 
             if (meStorage) {
                 this.me = new Member(JSON.parse(meStorage))
             }
 
-            if (daStorage == "null") {
-                localStorage.removeItem("discord_access")
+            this.token = localStorage.getItem("token")
+
+            if (this.token == null || this.token == "null") {
+                this.logout()
                 return
             }
 
-            const da = JSON.parse(daStorage)
+            const loggedInStorage = localStorage.getItem("logged_in")
 
-            if (da && da.access_token != '') {
-                this.authCode = "dummy"
-                this.accessToken = da.access_token
-
-                // convert da.expires_at from RFC3339 to Date
-                da.expires_at = Date.parse(da.expires_at)
-
-                if (da.expires_at <= Date.now()) {
-                    localStorage.removeItem("discord_access")
-                    this.authCode = null
-                    return
-                }
+            if (loggedInStorage == "true") {
                 this.loggedIn = true
             }
         },
         login(code) {
-            console.log("LOGGING IN")
             const connectionStore = useConnectionStore()
 
             connectionStore.addListener("login", (commandResponse) => {
-                if (commandResponse.error != '') {
-                    if (commandResponse.error == 'invalid_grant') {
-                        this.authCode = null
-                        // clear the code from params
-                        window.history.pushState({}, document.title, window.location.pathname)
+                if (commandResponse.action == 'refresh') {
+                    if (commandResponse.error == 'invalid_access') {
+                        this.logout()
+                        return
                     }
-                    return
+
+                    localStorage.setItem("token", commandResponse.result)
                 }
 
-                this.loggedIn = true
-                this.accessToken = commandResponse.result.access_token
+                if (commandResponse.action == 'auth') {
+                    if (commandResponse.error != '') {
+                        if (commandResponse.error == 'invalid_grant' || commandResponse.error == 'invalid_access') {
+                            this.logout()
+                            return
+                        }
 
-                // store the token
-                localStorage.setItem("discord_access", JSON.stringify(commandResponse.result))
+                        console.log("LOGIN ERROR: " + commandResponse.error)
+                        useErrorStore().$patch({ error: "Ran into a server error. Please try again later.", show: true, timeout: 5000, closeable: false, reason: "login" })
+                        return
+                    }
+
+                    this.loggedIn = true
+                    this.loggingIn = false
+                    this.token = commandResponse.result.token
+
+                    // store the token
+                    localStorage.setItem("token", commandResponse.result)
+                    localStorage.setItem("logged_in", "true")
+                }
             })
 
-            connectionStore.send(`login|auth:${code}`)
+            connectionStore.send('login', 'auth', code)
+            this.loggingIn = true
+        },
+        refresh() {
+            useConnectionStore().send(`login|refresh:`)
         },
         getMe() {
             if (this.me) {
                 return
             }
-
             const connectionStore = useConnectionStore()
 
-            connectionStore.addListener("me", (commandResponse) => {
-                const errorStore = useErrorStore()
-
-                if (commandResponse.error != '') {
-                    if (commandResponse.error != 'user_not_found') {
-                        console.error(commandResponse.error)
+            connectionStore.addListener("members", (commandResponse) => {
+                if (commandResponse.action == 'me') {
+                    if (commandResponse.error != '') {
+                        if (commandResponse.error != 'user_not_found') {
+                            console.error(commandResponse.error)
+                        }
+                        this.logout()
+                        return
                     }
 
-                    return
+                    this.me = new Member(commandResponse.result)
+
+                    localStorage.setItem("me", JSON.stringify(commandResponse.result))
                 }
-
-                this.me = new Member(commandResponse.result)
-
-                localStorage.setItem("me", JSON.stringify(commandResponse.result))
             })
-
-            connectionStore.send(`members|me:${this.accessToken}`)
+            connectionStore.send('members', 'me', '')
         },
         logout() {
             this.loggedIn = false
-            this.accessToken = null
+            this.token = null
             this.me = null
-            localStorage.removeItem("discord_access")
+            localStorage.removeItem("token")
             localStorage.removeItem("me")
+            localStorage.removeItem("logged_in")
+            // remove code from query
+            window.history.replaceState({}, document.title, window.location.pathname)
         }
     }
 })

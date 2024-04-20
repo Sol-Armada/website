@@ -6,6 +6,7 @@ export const CommandResponse = class CommandReponse {
         j = JSON.parse(j)
 
         this.thing = j.thing
+        this.action = j.action
         this.result = j.result
         this.error = j.error
     }

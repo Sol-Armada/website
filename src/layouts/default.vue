@@ -18,9 +18,7 @@ const emit = defineEmits(['onLogout'])
 const appStore = useAppStore()
 
 onMounted(() => {
-    if (appStore.accessToken != null) {
-        appStore.getMe()
-    }
+    appStore.getMe()
 })
 
 function isMobile() {

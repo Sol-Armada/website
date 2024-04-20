@@ -25,3 +25,4 @@ deploy.sh
 
 **/__debug_bin*
 **/config.*
+logs/
