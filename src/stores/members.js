@@ -1,59 +1,29 @@
 import { defineStore } from "pinia"
 import { useConnectionStore } from "./connection"
-import CommandResponse from "./classes"
 import { Member } from "./classes"
+import { useErrorStore } from "./error"
 
-export const useMembersStore = defineStore("members", () => {
-    const connectionStore = useConnectionStore()
+export const useMembersStore = defineStore("members", {
+    state: () => ({
+        members: [],
+    }),
+    actions: {
+        bindEvents() { this.getMembers() },
+        getMembers() {
+            const errorStore = useErrorStore()
+            const connectionStore = useConnectionStore()
 
-    // map of member id to member
-    const members = ref({})
+            connectionStore.addListener('members', 'list', (commandResponse) => {
+                // handle errors
+                if (commandResponse.error) {
+                    errorStore.$patch({ error: commandResponse.error, show: true })
+                    return
+                }
 
-    function bindEvents() {
-        connectionStore.$subscribe((mutation, state) => {
-            if (state.isConnected) {
-                connectionStore.socket.send("members|get")
-        
-                connectionStore.socket.addEventListener("message", (event) => {
-                    const commandResponse = new CommandResponse(event.data)
+                this.$patch({ members: commandResponse.result.map((m) => new Member(m)) })
+            })
 
-                    if (commandResponse.thing === "members") {
-                        commandResponse.result.forEach((memberJson) => {
-                            members.value[memberJson.id] = new Member(memberJson)
-                        })
-                    }
-                })
-            }
-        })
-
-        // sync the list of items upon connection
-        //   socket.on("connect", () => {
-        //     socket.emit("item:list", (res) => {
-        //       this.items = res.data
-        //     });
-        //   });
-
-        //   // update the store when an item was created
-        //   socket.on("item:created", (item) => {
-        //     this.items.push(item)
-        //   });
-    }
-
-    function createItem(label) {
-        // const item = {
-        //     id: Date.now(), // temporary ID for v-for key
-        //     label
-        // };
-        // items.push(item)
-
-        //   socket.emit("item:create", { label }, (res) => {
-        //     item.id = res.data
-        //   })
-    }
-
-    return {
-        members,
-        bindEvents,
-        createItem,
+            connectionStore.send('members', 'list', 1)
+        }
     }
 })

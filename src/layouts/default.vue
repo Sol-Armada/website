@@ -4,7 +4,7 @@
 
         <v-app-bar title="Application bar" v-else></v-app-bar>
 
-        <v-main class="d-flex justify-center scrollable" style="min-height: 300px;">
+        <v-main class="d-flex justify-center" style="min-height: 300px;">
             <router-view />
         </v-main>
     </v-app>
@@ -18,7 +18,9 @@ const emit = defineEmits(['onLogout'])
 const appStore = useAppStore()
 
 onMounted(() => {
-    appStore.getMe()
+    if (!appStore.me) {
+        appStore.getMe()
+    }
 })
 
 function isMobile() {

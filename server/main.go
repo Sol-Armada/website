@@ -72,7 +72,17 @@ func main() {
 		echoLogger = slog.New(log.NewWithOptions(f, opts))
 	}
 
-	logger.Info("starting server")
+	slog.Info("connecting to mongo and setting up stores")
+
+	host := viper.GetString("MONGO.HOST")
+	port := viper.GetInt("MONGO.PORT")
+	database := viper.GetString("MONGO.DATABASE")
+	if err := setupMembersStore(context.Background(), host, port, "", "", database); err != nil {
+		slog.Error("failed to setup members stores", "error", err)
+		return
+	}
+
+	logger.Info("starting websocket server")
 
 	hub := newHub(ctx)
 	go hub.run()

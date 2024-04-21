@@ -25,127 +25,67 @@ var loginActions = map[string]Action{
 	"refresh": refresh,
 }
 
-func authenticate(ctx context.Context, c *Client, arg any) {
+func authenticate(ctx context.Context, c *Client, arg any) CommandResponse {
 	cr := CommandResponse{
 		Thing:  "login",
 		Action: "auth",
 	}
-	defer func() {
-		j, _ := json.Marshal(cr)
-		c.send <- j
-	}()
 
 	code := arg.(string)
 
 	logger := slog.Default().With("code", code)
 	logger.Info("creating new user access")
 
-	redirectURI := viper.GetString("DISCORD.REDIRECT_URI")
-	clientId := viper.GetString("DISCORD.CLIENT_ID")
-	clientSecret := viper.GetString("DISCORD.CLIENT_SECRET")
-
-	logger = logger.With("redirect_uri", redirectURI, "client_id", clientId, "client_secret", clientSecret)
-
-	data := url.Values{}
-	data.Set("client_id", clientId)
-	data.Set("client_secret", clientSecret)
-	data.Set("redirect_uri", redirectURI)
-	data.Set("grant_type", "authorization_code")
-	data.Set("code", code)
-
-	logger.Debug("sending auth request")
-
-	req, err := http.NewRequest("POST", "https://discord.com/api/v10/oauth2/token", strings.NewReader(data.Encode()))
+	access, err := authenticateDiscord(code)
 	if err != nil {
-		logger.Error("failed to create request", "error", err)
-		cr.Error = err.Error()
-		return
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	logger.Debug("req for authentication to discord")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		logger.Error("failed to send request", "error", err)
-		cr.Error = err.Error()
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		logger.Error("unauthorized", "status", resp.StatusCode)
-		cr.Error = "invalid_grant"
-		return
-	}
-
-	if resp.StatusCode == http.StatusBadRequest {
-		errorMessage, _ := io.ReadAll(resp.Body)
-		type ErrorMessage struct {
-			ErrorType   string `json:"error"`
-			Description string `json:"error_description"`
-		}
-		errMsg := ErrorMessage{}
-		if err := json.Unmarshal(errorMessage, &errMsg); err != nil {
-			cr.Error = err.Error()
-			return
-		}
-		if errMsg.ErrorType == "invalid_grant" {
-			cr.Error = "invalid_grant"
-			return
+		if err.Error() != "invalid_grant" {
+			logger.Error("failed to authenticate", "error", err)
+			cr.Error = "internal_error"
+			return cr
 		}
 
-		cr.Error = errMsg.Description
-		return
-	}
-
-	access := map[string]interface{}{}
-	if err := json.NewDecoder(resp.Body).Decode(&access); err != nil {
-		logger.Error("failed to decode access", "error", err)
 		cr.Error = err.Error()
-		return
-	}
-
-	userAccessMap := map[string]interface{}{}
-	uaj, _ := json.Marshal(access)
-	if err := json.Unmarshal(uaj, &userAccessMap); err != nil {
-		logger.Error("failed to unmarshal user access", "error", err)
-		cr.Error = err.Error()
-		return
+		return cr
 	}
 
 	// convert expires in from int to time
-	expiresAt := time.Now().Add(time.Second * time.Duration(userAccessMap["expires_in"].(float64))).UTC()
+	expiresAt := time.Now().Add(time.Second * time.Duration(access["expires_in"].(float64))).UTC()
 
 	uAccess := userAccess{
-		Token:        userAccessMap["access_token"].(string),
-		RefreshToken: userAccessMap["refresh_token"].(string),
+		Token:        access["access_token"].(string),
+		RefreshToken: access["refresh_token"].(string),
 		ExpiresAt:    expiresAt,
 	}
 
 	logger.Debug("created new user access", "access", uAccess)
+
+	discordUser, err := getDiscordMe(uAccess)
+	if err != nil {
+		logger.Error("failed to get user", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	uAccess.Id = discordUser["id"].(string)
 
 	j, _ := json.Marshal(uAccess)
 	ecyrptedAccess, err := encrypt(string(j))
 	if err != nil {
 		logger.Error("failed to encrypt user access", "error", err)
 		cr.Error = err.Error()
-		return
+		return cr
 	}
 
 	cr.Result = ecyrptedAccess
+
+	return cr
 }
 
-func refresh(ctx context.Context, c *Client, arg any) {
+func refresh(ctx context.Context, c *Client, arg any) CommandResponse {
 	cr := CommandResponse{
 		Thing:  "login",
 		Action: "refresh",
 	}
-	defer func() {
-		j, _ := json.Marshal(cr)
-		c.send <- j
-	}()
 
 	uAccess := ctx.Value(contextKeyAccess).(userAccess)
 
@@ -168,8 +108,8 @@ func refresh(ctx context.Context, c *Client, arg any) {
 	req, err := http.NewRequest("POST", "https://discord.com/api/v10/oauth2/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		logger.Error("failed to create request", "error", err)
-		cr.Error = err.Error()
-		return
+		cr.Error = "internal_error"
+		return cr
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -179,15 +119,15 @@ func refresh(ctx context.Context, c *Client, arg any) {
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.Error("failed to send request", "error", err)
-		cr.Error = err.Error()
-		return
+		cr.Error = "internal_error"
+		return cr
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		logger.Error("unauthorized", "status", resp.StatusCode)
 		cr.Error = "invalid_grant"
-		return
+		return cr
 	}
 
 	if resp.StatusCode == http.StatusBadRequest {
@@ -198,17 +138,18 @@ func refresh(ctx context.Context, c *Client, arg any) {
 		}
 		errMsg := ErrorMessage{}
 		if err := json.Unmarshal(errorMessage, &errMsg); err != nil {
-			cr.Error = err.Error()
-			return
+			logger.Error("failed to unmarshal error message", "error", err)
+			cr.Error = "internal_error"
+			return cr
 		}
+
 		cr.Error = errMsg.Description
-		return
+		return cr
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		logger.Error("unauthorized", "status", resp.StatusCode)
 		cr.Error = "invalid_grant"
-		return
+		return cr
 	}
 
 	if resp.StatusCode == http.StatusBadRequest {
@@ -219,18 +160,20 @@ func refresh(ctx context.Context, c *Client, arg any) {
 		}
 		errMsg := ErrorMessage{}
 		if err := json.Unmarshal(errorMessage, &errMsg); err != nil {
-			cr.Error = err.Error()
-			return
+			logger.Error("failed to unmarshal error message", "error", err)
+			cr.Error = "internal_error"
+			return cr
 		}
+
 		cr.Error = errMsg.Description
-		return
+		return cr
 	}
 
 	discordAccessMap := map[string]interface{}{}
 	if err := json.NewDecoder(resp.Body).Decode(&discordAccessMap); err != nil {
 		logger.Error("failed to decode access", "error", err)
-		cr.Error = err.Error()
-		return
+		cr.Error = "internal_error"
+		return cr
 	}
 
 	// convert expires in from int to time
@@ -248,9 +191,11 @@ func refresh(ctx context.Context, c *Client, arg any) {
 	ecyrptedAccess, err := encrypt(string(j))
 	if err != nil {
 		logger.Error("failed to encrypt user access", "error", err)
-		cr.Error = err.Error()
-		return
+		cr.Error = "internal_error"
+		return cr
 	}
 
 	cr.Result = ecyrptedAccess
+
+	return cr
 }

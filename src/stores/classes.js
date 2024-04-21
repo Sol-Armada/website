@@ -32,4 +32,12 @@ export const Member = class Member {
     static eventsAttended
     /** @type {bool} */
     static validated
+
+    get officer() {
+        return this.isOfficer()
+    }
+
+    isOfficer() {
+        return this.rank.id <= 3
+    }
 }

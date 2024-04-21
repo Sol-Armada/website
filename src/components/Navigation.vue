@@ -21,6 +21,8 @@
             <v-divider></v-divider>
             <v-list-item link title="Home" to="/"></v-list-item>
             <v-list-item link title="Handbook" to="/handbook"></v-list-item>
+            <v-divider v-if="member && member.officer"></v-divider>
+            <v-list-item v-if="member && member.officer" link title="Members" to="/members"></v-list-item>
         </v-list>
 
         <template v-slot:append>
