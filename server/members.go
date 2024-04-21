@@ -146,6 +146,7 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 }
 
 func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
+
 	logger := slog.Default()
 
 	user := ctx.Value(contextKeyMember).(*users.User)
@@ -153,6 +154,11 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 	cr := CommandResponse{
 		Thing:  "members",
 		Action: "list",
+	}
+
+	if arg == "undefined" {
+		cr.Result = []*users.User{}
+		return cr
 	}
 
 	if user.Rank > ranks.Lieutenant {
