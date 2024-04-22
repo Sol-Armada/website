@@ -104,6 +104,7 @@ export default createVuetify({
           success: '#4CAF50',
           warning: '#FB8C00',
           'discord-primary': '#5865F2',
+          'card-on-surface': '1e3048',
         }
       }
     }

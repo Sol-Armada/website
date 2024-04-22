@@ -2,26 +2,22 @@
     <v-container fluid>
         <v-row>
             <v-col cols="12">
-                <v-card-title>members</v-card-title>
-                <v-divider></v-divider>
-                <v-infinite-scroll :items="members" @load="load">
-                    <template v-for="(member, _) in members" :key="member.id">
-                        <Member :member="member" />
-                    </template>
-                </v-infinite-scroll>
-                <!-- <v-virtual-scroll :items="members">
+                <v-card class="bg-card-on-surface">
+                    <v-card-title>Members</v-card-title>
+                    <v-divider></v-divider>
 
-                    <template v-slot:default="{ item }">
-                        <v-card :class="'bg-surface-' + ld + '-1'">
-                            <v-row class="pa-2">
-                                <v-col cols="2">
-                                    <Member :member="item" />
-                                </v-col>
-                            </v-row>
-                        </v-card>
-                    </template>
+                    <v-card class="bg-card-on-surface">
+                        <template v-slot:text>
+                            <v-text-field v-model="search" label="Search" prepend-inner-icon="mdi-magnify"
+                                variant="outlined" hide-details single-line></v-text-field>
+                        </template>
+                        <v-data-table class="bg-card-on-surface" :items="members" :items-per-page="10"
+                            :headers="headers" density="compact" :search="search" :loading="loading"
+                            :loading-text="loadingText" color="white">
+                        </v-data-table>
+                    </v-card>
 
-</v-virtual-scroll> -->
+                </v-card>
             </v-col>
         </v-row>
     </v-container>
@@ -31,13 +27,18 @@ import Member from '@/components/member.vue'
 
 import { onMounted, ref } from 'vue'
 import { useTheme } from 'vuetify'
-import { storeToRefs } from 'pinia'
 import { useMembersStore } from '@/stores/members'
 
 const memberStore = useMembersStore()
 
+const loading = ref(true)
+const loadingText = ref('Loading members... 0')
+
+const headers = [{ title: 'Name', key: 'name' }, { title: 'Rank', key: 'rank.name' }, { title: 'Events Attended', key: 'eventsAttended' }]
 const members = ref([])
-const page = ref(1)
+const membersPage = ref(0)
+const page = ref(15)
+const search = ref('')
 
 const theme = useTheme()
 const ld = ref('darken')
@@ -46,17 +47,25 @@ if (theme.current.value.dark) {
 }
 
 onMounted(async () => {
-    const m = await memberStore.getMembers(page.value)
+    let m = []
+    while (true) {
+        let moreMembers = await memberStore.getMembers(membersPage.value)
+        if (moreMembers.length == 0) {
+            console.log("no more members")
+            loading.value = false
+            break
+        }
+        m = m.concat(moreMembers)
+        loadingText.value = `Loading members... (${m.length})`
+        membersPage.value += 1
+    }
     members.value = m
 })
 
-async function load({ done }) {
+async function load() {
     page.value += 1
-    console.log("NEXT PAGE", page.value)
     const moreMembers = await memberStore.getMembers(page.value)
-    console.log(moreMembers)
     members.value = members.value.concat(moreMembers)
-    done('ok')
 }
 
 </script>

@@ -21,7 +21,7 @@ export const useMembersStore = defineStore("members", {
 
                 setTimeout(() => {
                     connectionStore.send('members', 'list', page)
-                }, 1000)
+                }, 500)
             })
         }
     }

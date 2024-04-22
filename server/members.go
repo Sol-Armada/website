@@ -42,14 +42,18 @@ func (m *membersCollection) GetMembers(ctx context.Context, page int) ([]*users.
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	opts := options.Find().SetSort(bson.M{"rank": 1}).SetLimit(50).SetSkip(int64(50 * (page - 1)))
+	opts := options.Find().SetSort(bson.M{"rank": 1}).SetLimit(100).SetSkip(int64(100 * (page - 1)))
 
-	cursor, err := m.Find(ctx, bson.M{}, opts)
+	cursor, err := m.Find(ctx, bson.D{{Key: "is_bot", Value: bson.D{{Key: "$eq", Value: false}}}}, opts)
 	if err != nil {
 		return nil, err
 	}
 	if err := cursor.All(ctx, &members); err != nil {
 		return nil, err
+	}
+
+	if len(members) == 0 {
+		return nil, mongo.ErrNoDocuments
 	}
 
 	return members, nil
@@ -179,6 +183,10 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 
 	m, err := members.GetMembers(ctx, page)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			cr.Result = []*users.User{}
+			return cr
+		}
 		logger.Error("failed to list users", "error", err)
 		cr.Error = "internal_error"
 		return cr
