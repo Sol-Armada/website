@@ -24,7 +24,7 @@ router.beforeEach((to, from, next) => {
 
     // check if they have permission to the page
     const appStore = useAppStore()
-    console.log(to.meta)
+    console.log(appStore.me.rank.id)
     if (to.meta.requiresOfficer && appStore.me.rank.id > 3) {
         next('/')
         return

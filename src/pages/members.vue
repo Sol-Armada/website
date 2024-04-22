@@ -12,15 +12,39 @@
                                 variant="outlined" hide-details single-line></v-text-field>
                         </template>
                         <v-container fluid :style="{ height: '100%' }">
-                            <v-data-table class="bg-card-on-surface" :items="members" :disable-items-per-page=true
-                                :headers="headers" density="compact" :search="search" :loading="loading"
-                                :itemsPerPageOptions="[12]" :loading-text="loadingText" color="white"
+                            <v-data-table id="members" class="bg-card-on-surface" :items="members"
+                                :disable-items-per-page=true :headers="headers" density="compact" :search="search"
+                                :loading="loading" :itemsPerPageOptions="[12]" :loading-text="loadingText" color="white"
                                 v-model:page="page" v-touch="{
                                     left: () => swipe('Left'),
-                                    right: () => swipe('Right'),
-                                    up: () => swipe('Up'),
-                                    down: () => swipe('Down')
-                                }"></v-data-table>
+                                    right: () => swipe('Right')
+                                }">
+                                <template v-slot:item="{ item }">
+                                    <tr>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.name }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.rank.name }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.eventsAttended }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </v-data-table>
                         </v-container>
                     </v-card>
 
@@ -72,14 +96,14 @@ function swipe(direction) {
 onMounted(async () => {
     let m = []
     while (true) {
+        loadingText.value = `Loading members... (${m.length})`
         let moreMembers = await memberStore.getMembers(membersPage.value)
-        if (moreMembers.length == 0) {
+        m = m.concat(moreMembers)
+        if (moreMembers.length > 0) {
             console.log("no more members")
             loading.value = false
             break
         }
-        m = m.concat(moreMembers)
-        loadingText.value = `Loading members... (${m.length})`
         membersPage.value += 1
     }
     members.value = m
@@ -92,9 +116,50 @@ async function load() {
 }
 
 </script>
-<style>
-.v-data-table-footer__items-per-page {
-    display: none;
+<style lang="scss">
+#members .v-data-table-footer__items-per-page {
+    display: none !important;
+}
+
+#members tr>td {
+    border: none;
+}
+
+#members tr>td:first-of-type {
+    padding-right: 0;
+
+    .v-col {
+        padding: 5px 0 5px 0;
+    }
+
+    .v-card {
+        border-radius: 8px 0 0 8px;
+    }
+}
+
+#members tr>td:not(:first-of-type):not(:last-of-type) {
+    padding-right: 0;
+    padding-left: 0;
+
+    .v-col {
+        padding: 0;
+    }
+
+    .v-card {
+        border-radius: 0;
+    }
+}
+
+#members tr>td:last-of-type {
+    padding-left: 0;
+
+    .v-col {
+        padding: 0;
+    }
+
+    .v-card {
+        border-radius: 0 8px 8px 0;
+    }
 }
 </style>
 <route lang="yaml">
