@@ -7,7 +7,7 @@
           class="d-inline-block mx-2 social-link" rel="noopener noreferrer" target="_blank">
           <v-icon :icon="item.icon" :size="item.icon === '$vuetify' ? 24 : 16" />
         </a>
-        <div class="text-caption text-disabled" >
+        <div class="text-caption text-disabled">
           &copy; 2016-{{ (new Date()).getFullYear() }} <span class="d-none d-sm-inline-block">Sol Armada</span>
         </div>
       </v-col>
@@ -20,17 +20,17 @@
 const items = [
   {
     title: 'Sol Armada GitHub',
-    icon: `mdi-github`,
+    icon: `mdi:mdi-github`,
     href: 'https://github.com/sol-armada',
   },
   {
     title: 'Sol Armada Discord',
-    icon: `fa:fa fa-brands fa-discord`,
+    icon: `fa fa-brands fa-discord`,
     href: 'https://community.vuetifyjs.com/',
   },
   {
     title: 'Sol Armada YouTube',
-    icon: `fa:fa fa-brands fa-youtube`,
+    icon: `fa fa-brands fa-youtube`,
     href: 'https://www.youtube.com/@Sol-Armada',
   },
 ]
