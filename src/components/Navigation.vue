@@ -1,5 +1,13 @@
 <template>
-    <v-navigation-drawer permanent>
+    <v-app-bar v-if="$vuetify.display.mobile">
+        <template v-slot:prepend>
+            <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
+        </template>
+
+        <v-app-bar-title>Sol Armada</v-app-bar-title>
+    </v-app-bar>
+
+    <v-navigation-drawer :temporary="isMobile()" v-model="drawer">
         <v-list>
             <v-list-item>
                 <v-sheet>
@@ -38,10 +46,17 @@
 </template>
 
 <script setup>
-import { Member } from '../stores/classes'
+import { Member } from '@/stores/classes'
+
+const drawer = ref(!isMobile())
 
 const props = defineProps({
     member: Member,
     logout: Function
 })
+
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
+
 </script>

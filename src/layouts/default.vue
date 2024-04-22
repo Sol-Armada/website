@@ -1,8 +1,6 @@
 <template>
     <v-app>
-        <Navigation v-if="!isMobile()" :member="appStore.me" :logout="logout" />
-
-        <v-app-bar title="Application bar" v-else></v-app-bar>
+        <Navigation :member="appStore.me" :logout="logout" />
 
         <v-main class="d-flex justify-center" style="min-height: 300px;">
             <router-view />
@@ -22,10 +20,6 @@ onMounted(() => {
         appStore.getMe()
     }
 })
-
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-}
 
 function logout() {
     appStore.logout()

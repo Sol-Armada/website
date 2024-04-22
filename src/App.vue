@@ -4,6 +4,7 @@
 </template>
 
 <script setup>
+import '@mdi/font/css/materialdesignicons.css'
 import { useAppStore } from "@/stores/app"
 import { useConnectionStore } from "@/stores/connection"
 
