@@ -23,7 +23,7 @@
                                     <tr>
                                         <td>
                                             <v-col cols="12">
-                                                <v-card>
+                                                <v-card :border="item.rank.color + ' s-xl'">
                                                     <v-card-text>{{ item.name }}</v-card-text>
                                                 </v-card>
                                             </v-col>

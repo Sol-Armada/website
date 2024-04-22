@@ -14,6 +14,19 @@ import { createVuetify } from 'vuetify'
 import { aliases, fa } from 'vuetify/iconsets/fa'
 import { mdi } from 'vuetify/iconsets/mdi'
 
+const rankColors = {
+  admiral: '#1E52E6',
+  commander: '#308CA7',
+  lieutenant: '#24AD32',
+  specialist: '#DA5C5C',
+  technician: '#E69737',
+  member: '#FFC900',
+  recruit: '#1CFAC0',
+  guest: '#929292',
+  ally: '#F87847',
+  bot: '#206694',
+}
+
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
   icons: {
@@ -27,7 +40,7 @@ export default createVuetify({
   theme: {
     defaultTheme: 'dark',
     variations: {
-      colors: ['surface'],
+      colors: ['surface', 'commander'],
       lighten: 4,
       darken: 4
     },
@@ -67,6 +80,7 @@ export default createVuetify({
           success: '#4CAF50',
           warning: '#FB8C00',
           'discord-primary': '#5865F2',
+          ...rankColors
         }
       },
       'dark': {
@@ -105,6 +119,7 @@ export default createVuetify({
           warning: '#FB8C00',
           'discord-primary': '#5865F2',
           'card-on-surface': '1e3048',
+          ...rankColors
         }
       }
     }
