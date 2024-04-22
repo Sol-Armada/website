@@ -22,11 +22,13 @@ router.beforeEach((to, from, next) => {
         return
     }
 
-    // redirect to home page if logged in and trying to access login page
-    // if (to.path === '/login' && localStorage.getItem('logged_in')) {
-    //     next('/')
-    //     return
-    // }
+    // check if they have permission to the page
+    const appStore = useAppStore()
+    console.log(to.meta)
+    if (to.meta.requiresOfficer && appStore.me.rank.id > 3) {
+        next('/')
+        return
+    }
 
     next()
 })

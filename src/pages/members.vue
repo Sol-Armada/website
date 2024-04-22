@@ -100,4 +100,5 @@ async function load() {
 <route lang="yaml">
 meta:
     layout: default
+    requiresOfficer: true
 </route>
