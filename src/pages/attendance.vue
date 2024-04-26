@@ -2,9 +2,9 @@
 <template>
     <v-container fluid>
         <v-row class="justify-center">
-            <v-col cols="6">
+            <v-col cols="8">
                 <v-card class="bg-card-on-surface">
-                    <v-card-title>Members</v-card-title>
+                    <v-card-title>Attendance Records</v-card-title>
                     <v-divider></v-divider>
 
                     <v-card class="bg-card-on-surface">
@@ -13,7 +13,7 @@
                                 variant="outlined" hide-details single-line></v-text-field>
                         </template>
                         <v-container fluid :style="{ height: '100%' }">
-                            <v-data-table id="members" class="bg-card-on-surface" :items="members"
+                            <v-data-table id="attendance-records" class="bg-card-on-surface" :items="attendanceRecords"
                                 :disable-items-per-page=true :headers="headers" density="compact" :search="search"
                                 :loading="loading" :itemsPerPageOptions="[12]" :loading-text="loadingText" color="white"
                                 v-model:page="page" v-touch="{
@@ -22,24 +22,31 @@
                                 }">
                                 <template v-slot:item="{ item }">
                                     <tr>
-                                        <td width="33.33%">
-                                            <v-col cols="12">
-                                                <v-card :border="item.rank.color + ' s-xl'">
-                                                    <v-card-text>{{ item.name }}</v-card-text>
-                                                </v-card>
-                                            </v-col>
-                                        </td>
-                                        <td width="33.33%">
+                                        <td>
                                             <v-col cols="12">
                                                 <v-card>
-                                                    <v-card-text>{{ item.rank.name }}</v-card-text>
+                                                    <v-card-text>{{ item.name }}</v-card-text>
                                                 </v-card>
                                             </v-col>
                                         </td>
                                         <td>
                                             <v-col cols="12">
                                                 <v-card>
-                                                    <v-card-text>{{ item.eventsAttended }}</v-card-text>
+                                                    <v-card-text>{{ item.numberOfMembers() }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.submittedBy.name }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.recorded ? 'Yes' : 'No' }}</v-card-text>
                                                 </v-card>
                                             </v-col>
                                         </td>
@@ -57,16 +64,21 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useTheme } from 'vuetify'
-import { useMembersStore } from '@/stores/members'
+import { useAttendanceStore } from '@/stores/attendance'
 
-const memberStore = useMembersStore()
+const attendanceStore = useAttendanceStore()
 
 const loading = ref(true)
-const loadingText = ref('Loading members... 0')
+const loadingText = ref('Loading attendance records... 0')
 
-const headers = [{ title: 'Name', key: 'name' }, { title: 'Rank', key: 'rank.name' }, { title: 'Events Attended', key: 'eventsAttended' }]
-const members = ref([])
-const membersPage = ref(0)
+const headers = [
+    { title: 'Name', key: 'name' },
+    { title: 'Member Count', key: 'memberCount' },
+    {title: 'Submitted by', key: 'submittedBy'},
+    {title: 'Recorded', key: 'recorded'}
+]
+const attendanceRecords = ref([])
+const attendanceRecordsPage = ref(1)
 const page = ref(1)
 const search = ref('')
 
@@ -77,7 +89,7 @@ if (theme.current.value.dark) {
 }
 
 const pageCount = computed(() => {
-    return Math.ceil(members.value.length / 10)
+    return Math.ceil(attendanceRecords.value.length / 10)
 })
 
 function swipe(direction) {
@@ -93,19 +105,19 @@ function swipe(direction) {
 }
 
 onMounted(async () => {
-    let m = []
+    let a = []
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        loadingText.value = `Loading members... (${m.length})`
-        let moreMembers = await memberStore.getMembers(membersPage.value)
-        m = m.concat(moreMembers)
-        if (moreMembers.length == 0) {
-            console.log("no more members")
+        loadingText.value = `Loading attendance records... (${a.length})`
+        let moreAttendanceRecords = await attendanceStore.getAttendanceRecords(attendanceRecordsPage.value)
+        a = a.concat(moreAttendanceRecords)
+        if (moreAttendanceRecords.length == 0) {
+            console.log("no more attendance records")
             loading.value = false
             break
         }
-        membersPage.value += 1
-        members.value = m
+        attendanceRecordsPage.value += 1
+        attendanceRecords.value = a
     }
 })
 
@@ -117,15 +129,15 @@ onMounted(async () => {
 
 </script>
 <style lang="scss">
-#members .v-data-table-footer__items-per-page {
+#attendance-records .v-data-table-footer__items-per-page {
     display: none !important;
 }
 
-#members tr>td {
+#attendance-records tr>td {
     border: none;
 }
 
-#members tr>td:first-of-type {
+#attendance-records tr>td:first-of-type {
     padding-right: 0;
 
     .v-col {
@@ -137,7 +149,7 @@ onMounted(async () => {
     }
 }
 
-#members tr>td:not(:first-of-type):not(:last-of-type) {
+#attendance-records tr>td:not(:first-of-type):not(:last-of-type) {
     padding-right: 0;
     padding-left: 0;
 
@@ -150,7 +162,7 @@ onMounted(async () => {
     }
 }
 
-#members tr>td:last-of-type {
+#attendance-records tr>td:last-of-type {
     padding-left: 0;
 
     .v-col {

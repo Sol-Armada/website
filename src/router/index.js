@@ -17,14 +17,12 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     // redirect to login page if not logged in and trying to access a restricted page
     if (to.path !== '/login' && !localStorage.getItem('logged_in')) {
-        console.log("NOT LOGGED IN")
         next('/login')
         return
     }
 
     // check if they have permission to the page
     const appStore = useAppStore()
-    console.log(appStore.me.rank.id)
     if (to.meta.requiresOfficer && appStore.me.rank.id > 3) {
         next('/')
         return

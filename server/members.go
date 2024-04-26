@@ -2,17 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sol-armada/admin/ranks"
 	"github.com/sol-armada/admin/users"
-	"go.mongodb.org/mongo-driver/bson"
+	solmembers "github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/ranks"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var membersActions = map[string]Action{
@@ -20,71 +17,8 @@ var membersActions = map[string]Action{
 	"me":   getMe,
 }
 
-type membersCollection struct {
+type MembersCollection struct {
 	*mongo.Collection
-}
-
-var client *mongo.Client
-var members *membersCollection
-
-func (m *membersCollection) GetMemberById(ctx context.Context, id string) (*users.User, error) {
-	member := &users.User{}
-	if err := m.FindOne(ctx, bson.M{"_id": id}).Decode(member); err != nil {
-		return nil, err
-	}
-
-	return member, nil
-}
-
-func (m *membersCollection) GetMembers(ctx context.Context, page int) ([]*users.User, error) {
-	var members []*users.User
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	opts := options.Find().SetSort(bson.M{"rank": 1}).SetLimit(100).SetSkip(int64(100 * (page - 1)))
-
-	cursor, err := m.Find(ctx, bson.D{{Key: "is_bot", Value: bson.D{{Key: "$eq", Value: false}}}}, opts)
-	if err != nil {
-		return nil, err
-	}
-	if err := cursor.All(ctx, &members); err != nil {
-		return nil, err
-	}
-
-	if len(members) == 0 {
-		return nil, mongo.ErrNoDocuments
-	}
-
-	return members, nil
-}
-
-func (m *membersCollection) UpdateMember(ctx context.Context, member *users.User) error {
-	_, err := m.UpdateOne(ctx, bson.M{"_id": member.ID}, bson.M{"$set": member})
-	return err
-}
-
-func setupMembersStore(ctx context.Context, host string, port int, username string, password string, database string) error {
-	if client != nil {
-		return nil
-	}
-
-	usernamePassword := username + ":" + password + "@"
-	if usernamePassword == ":@" {
-		usernamePassword = ""
-	}
-
-	uri := fmt.Sprintf("mongodb://%s%s:%d", usernamePassword, host, port)
-	clientOptions := options.Client().ApplyURI(uri).SetConnectTimeout(5 * time.Second)
-	c, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		return errors.Wrap(err, "creating new store")
-	}
-	client = c
-
-	members = &membersCollection{client.Database(database).Collection("users")}
-
-	return nil
 }
 
 func getMe(ctx context.Context, c *Client, token any) CommandResponse {
@@ -98,9 +32,9 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 	logger := slog.With("token", uAccess.Token)
 	logger.Info("creating new user access")
 
-	user := &users.User{}
+	member := &solmembers.Member{}
 
-	userMap, err := getDiscordMe(uAccess)
+	discordUserMap, err := getDiscordMe(uAccess)
 	if err != nil {
 		if err.Error() != "invalid_grant" {
 			logger.Error("failed to get user", "error", err)
@@ -111,9 +45,9 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 		return cr
 	}
 
-	user.ID = userMap["id"].(string)
+	member.Id = discordUserMap["id"].(string)
 
-	user, err = members.GetMemberById(ctx, user.ID)
+	member, err = solmembers.Get(member.Id)
 	if err != nil {
 		if !errors.Is(err, mongo.ErrNoDocuments) {
 			logger.Error("failed to get user", "error", err)
@@ -121,30 +55,36 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 			return cr
 		}
 
-		user.ID = userMap["id"].(string)
-		user.Name = userMap["username"].(string)
-		user.Rank = ranks.Guest
-		avatar, ok := userMap["avatar"].(string)
+		member.Id = discordUserMap["id"].(string)
+		member.Name = discordUserMap["username"].(string)
+		member.Rank = ranks.None
+		avatar, ok := discordUserMap["avatar"].(string)
 		if !ok {
 			avatar = ""
 		}
-		user.Avatar = avatar
+		member.Avatar = avatar
 
-		cr.Result = user
+		cr.Result = member
 		return cr
 	}
 
-	if user.Avatar == "" {
-		user.Avatar = userMap["avatar"].(string)
+	if member.Avatar == "" {
+		member.Avatar = discordUserMap["avatar"].(string)
 
-		if err := members.UpdateMember(ctx, user); err != nil {
-			logger.Error("failed to update user", "error", err)
+		if err := member.Save(); err != nil {
+			logger.Error("failed to save member", "error", err)
 			cr.Error = "internal_error"
 			return cr
 		}
+
+		// if err := membersCollection.UpdateMember(ctx, user); err != nil {
+		// 	logger.Error("failed to update user", "error", err)
+		// 	cr.Error = "internal_error"
+		// 	return cr
+		// }
 	}
 
-	cr.Result = user
+	cr.Result = member
 
 	return cr
 }
@@ -153,7 +93,7 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 
 	logger := slog.Default()
 
-	user := ctx.Value(contextKeyMember).(*users.User)
+	member := ctx.Value(contextKeyMember).(*solmembers.Member)
 
 	cr := CommandResponse{
 		Thing:  "members",
@@ -165,7 +105,7 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 		return cr
 	}
 
-	if user.Rank > ranks.Lieutenant {
+	if member.Rank > ranks.Lieutenant {
 		cr.Error = "unauthorized"
 		return cr
 	}
@@ -181,18 +121,14 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 		page = 1
 	}
 
-	m, err := members.GetMembers(ctx, page)
+	members, err := solmembers.List(page)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			cr.Result = []*users.User{}
-			return cr
-		}
 		logger.Error("failed to list users", "error", err)
 		cr.Error = "internal_error"
 		return cr
 	}
 
-	cr.Result = m
+	cr.Result = members
 
 	return cr
 }

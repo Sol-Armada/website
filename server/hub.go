@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+
+	"github.com/sol-armada/sol-bot/members"
 )
 
 type CommandRequest struct {
@@ -94,7 +96,7 @@ func (h *Hub) run() {
 
 				ctx = context.WithValue(ctx, contextKeyAccess, access)
 
-				member, err := members.GetMemberById(ctx, access.Id)
+				member, err := members.Get(access.Id)
 				if err != nil {
 					logger.Error("failed to get user", "error", err)
 					r := CommandResponse{Thing: command.Thing, Action: command.Action, Error: "internal_error"}
@@ -114,6 +116,8 @@ func (h *Hub) run() {
 				res = loginActions[command.Action](ctx, command.Client, command.Arg)
 			case "contracts":
 				res = contractsActions[command.Action](ctx, command.Client, command.Arg)
+			case "attendance":
+				res = attendanceActions[command.Action](ctx, command.Client, command.Arg)
 			}
 
 			command.Client.send <- res.ToJsonBytes()

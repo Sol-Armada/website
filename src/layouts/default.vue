@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-app>
         <Navigation />
@@ -8,7 +9,6 @@
     </v-app>
 </template>
 
-<script setup>
-</script>
+<script setup></script>
 
 <style lang="scss"></style>

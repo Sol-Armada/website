@@ -29,9 +29,10 @@
             <v-divider></v-divider>
             <v-list-item link title="Home" to="/"></v-list-item>
             <v-list-item link title="Handbook" to="/handbook"></v-list-item>
-            <div v-if="me.rank.id <= 3">
+            <div v-if="me && me.rank.id <= 3">
                 <v-divider></v-divider>
                 <v-list-item link title="Members" to="/members"></v-list-item>
+                <v-list-item link title="Attendance Records" to="/attendance"></v-list-item>
             </div>
         </v-list>
         <template v-slot:append>
@@ -48,6 +49,7 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 
@@ -60,7 +62,6 @@ onMounted(() => {
     if (!appStore.me) {
         appStore.getMe()
     }
-    console.log(me.value)
 })
 
 function isMobile() {

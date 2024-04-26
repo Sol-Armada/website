@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import { useConnectionStore } from './connection'
 import { useErrorStore } from './error'
 import { Member } from './classes'
-import { computed } from 'vue'
 
 export const useAppStore = defineStore('app', () => {
     const errorStore = useErrorStore()
@@ -17,6 +16,10 @@ export const useAppStore = defineStore('app', () => {
         loggedIn.value = localStorage.getItem('logged_in')
         me.value = JSON.parse(localStorage.getItem('me'))
         token.value = localStorage.getItem('token')
+
+        // if (me.value == null) {
+        //     getMe()
+        // }
     }
     function login(code) {
         connectionStore.addListener('login', 'auth', (commandResponse) => {
@@ -45,7 +48,7 @@ export const useAppStore = defineStore('app', () => {
 
     function refresh() { }
     function getMe() {
-        if (this.me) {
+        if (me.value) {
             return
         }
 
@@ -60,13 +63,18 @@ export const useAppStore = defineStore('app', () => {
                 }
             }
 
+            console.log(commandResponse)
+
             me.value = new Member(commandResponse.result)
 
             save()
         })
 
+        console.log("getting me")
+
         connectionStore.send('members', 'me')
     }
+
     function logout() {
         loggedIn.value = false
         token.value = null

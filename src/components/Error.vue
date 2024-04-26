@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-snackbar v-model="show" color="error" location="top" :timeout="timeout">
         {{ error }}
