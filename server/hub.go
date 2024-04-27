@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
+
+	"github.com/sol-armada/sol-bot/members"
 )
 
 type CommandRequest struct {
@@ -20,7 +23,12 @@ type CommandResponse struct {
 	Error  string `json:"error"`
 }
 
-type Action func(ctx context.Context, c *Client, arg any)
+func (c *CommandResponse) ToJsonBytes() []byte {
+	j, _ := json.Marshal(c)
+	return j
+}
+
+type Action func(ctx context.Context, c *Client, arg any) CommandResponse
 
 type Hub struct {
 	// registered clients
@@ -42,6 +50,7 @@ type contextKey string
 
 const (
 	contextKeyAccess contextKey = "access"
+	contextKeyMember contextKey = "member"
 )
 
 func newHub(ctx context.Context) *Hub {
@@ -58,34 +67,60 @@ func (h *Hub) run() {
 	for {
 		select {
 		case client := <-h.register:
+			slog.Default().Info("registering client")
 			h.clients[client] = true
 		case client := <-h.unregister:
+			slog.Default().Info("unregistering client")
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
 			}
 		case command := <-h.broadcast:
+			ctx := context.Background()
+
+			logger := slog.Default()
+
+			logger.Info("received command", slog.String("thing", command.Thing), slog.String("action", command.Action))
+
 			var access userAccess
-			if command.Token != "" && command.Token != "null" {
+			if command.Token != "" && command.Token != "null" && command.Action != "auth" {
 				uAccessRaw, err := decrypt(command.Token)
 				if err != nil {
 					command.Client.send <- []byte(err.Error())
-					return
+					continue
 				}
 				if err := json.Unmarshal([]byte(uAccessRaw), &access); err != nil {
 					command.Client.send <- []byte(err.Error())
-					return
+					continue
 				}
+
+				ctx = context.WithValue(ctx, contextKeyAccess, access)
+
+				member, err := members.Get(access.Id)
+				if err != nil {
+					logger.Error("failed to get user", "error", err)
+					r := CommandResponse{Thing: command.Thing, Action: command.Action, Error: "internal_error"}
+					command.Client.send <- r.ToJsonBytes()
+					continue
+				}
+
+				ctx = context.WithValue(ctx, contextKeyMember, member)
 			}
 
-			ctx := context.WithValue(context.Background(), contextKeyAccess, access)
+			var res CommandResponse
 
 			switch command.Thing {
 			case "members":
-				membersActions[command.Action](ctx, command.Client, command.Arg)
+				res = membersActions[command.Action](ctx, command.Client, command.Arg)
 			case "login":
-				loginActions[command.Action](ctx, command.Client, command.Arg)
+				res = loginActions[command.Action](ctx, command.Client, command.Arg)
+			case "contracts":
+				res = contractsActions[command.Action](ctx, command.Client, command.Arg)
+			case "attendance":
+				res = attendanceActions[command.Action](ctx, command.Client, command.Arg)
 			}
+
+			command.Client.send <- res.ToJsonBytes()
 
 			// to broadcast to all connected clients
 			// for client := range h.clients {

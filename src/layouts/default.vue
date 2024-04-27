@@ -1,33 +1,14 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-app>
-        <Navigation v-if="!isMobile()" :member="appStore.me" :logout="logout" />
+        <Navigation />
 
-        <v-app-bar title="Application bar" v-else></v-app-bar>
-
-        <v-main class="d-flex justify-center scrollable" style="min-height: 300px;">
+        <v-main class="d-flex justify-center" style="min-height: 300px;">
             <router-view />
         </v-main>
     </v-app>
 </template>
 
-<script setup>
-import { useAppStore } from '@/stores/app'
-
-const emit = defineEmits(['onLogout'])
-
-const appStore = useAppStore()
-
-onMounted(() => {
-    appStore.getMe()
-})
-
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-}
-
-function logout() {
-    appStore.logout()
-}
-</script>
+<script setup></script>
 
 <style lang="scss"></style>

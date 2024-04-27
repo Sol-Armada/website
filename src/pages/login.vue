@@ -15,7 +15,8 @@
                             <div class="py-2" />
 
                             <v-btn prepend-icon="fa:fas fa-brands fa-discord" size="large" color="discord-primary"
-                                v-if="!appStore.loggingIn" :href="discordAuthUrl">Login with Discord</v-btn>
+                                v-if="!appStore.loggingIn && code === null" :href="discordAuthUrl">Login with
+                                Discord</v-btn>
 
                             <v-progress-circular :size="50" color="primary" indeterminate v-else></v-progress-circular>
                         </div>
@@ -36,15 +37,11 @@ const appStore = useAppStore()
 
 const discordAuthUrl = ref(import.meta.env.VITE_DISCORD_AUTH_URL)
 const theme = useTheme()
-console.log(theme.name.value)
 const logoColor = ref("blue")
+const code = ref(new URLSearchParams(window.location.search).get('code'))
 
 // get the code from the query params
 const urlParams = new URLSearchParams(window.location.search)
-
-if (urlParams.has('code')) {
-    appStore.login(urlParams.get('code'))
-}
 
 onMounted(() => {
     // if the theme is dark, set the logo to white

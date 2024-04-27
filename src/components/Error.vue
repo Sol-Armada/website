@@ -1,22 +1,21 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
-        <v-snackbar v-model="props.show" color="error" location="top" :timeout="props.timeout">
-            {{ text }}
+    <v-snackbar v-model="show" color="error" location="top" :timeout="timeout">
+        {{ error }}
 
-            <template v-slot:actions v-if="props.closable">
-                <v-btn variant="text" @click="props.show = false">
-                    Close
-                </v-btn>
-            </template>
-            <v-progress-linear indeterminate v-if="props.loading"></v-progress-linear>
-        </v-snackbar>
+        <template v-slot:actions v-if="closable">
+            <v-btn variant="text" @click="show = false">
+                Close
+            </v-btn>
+        </template>
+        <v-progress-linear indeterminate v-if="loading"></v-progress-linear>
+    </v-snackbar>
 </template>
 
 <script setup>
-const props = defineProps({
-    text: String,
-    show: Boolean,
-    timeout: Number,
-    loading: Boolean,
-    closable: Boolean
-})
+import { storeToRefs } from 'pinia'
+import { useErrorStore } from '@/stores/error'
+
+const errorStore = useErrorStore()
+const { error, show, loading, timeout, closable } = storeToRefs(errorStore)
 </script>

@@ -16,6 +16,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	slogecho "github.com/samber/slog-echo"
+	attndnc "github.com/sol-armada/sol-bot/attendance"
+	"github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/stores"
 	"github.com/spf13/viper"
 )
 
@@ -72,7 +75,27 @@ func main() {
 		echoLogger = slog.New(log.NewWithOptions(f, opts))
 	}
 
-	logger.Info("starting server")
+	slog.Info("connecting to mongo and setting up stores")
+
+	host := viper.GetString("MONGO.HOST")
+	port := viper.GetInt("MONGO.PORT")
+	database := viper.GetString("MONGO.DATABASE")
+	if _, err := stores.New(ctx, host, port, "", "", database); err != nil {
+		slog.Error("failed to connect to mongo", "error", err)
+		return
+	}
+
+	if err := members.Setup(); err != nil {
+		slog.Error("failed to setup members", "error", err)
+		return
+	}
+
+	if err := attndnc.Setup(); err != nil {
+		slog.Error("failed to setup attendance", "error", err)
+		return
+	}
+
+	logger.Info("starting websocket server")
 
 	hub := newHub(ctx)
 	go hub.run()

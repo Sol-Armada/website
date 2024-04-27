@@ -2,164 +2,133 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
+	"strconv"
 
-	"github.com/sol-armada/admin/ranks"
-	"github.com/sol-armada/admin/stores"
+	"github.com/pkg/errors"
 	"github.com/sol-armada/admin/users"
-	"github.com/spf13/viper"
+	solmembers "github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/ranks"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var membersActions = map[string]Action{
-	"get": getMembers,
-	"me":  getMe,
+	"list": getMembers,
+	"me":   getMe,
 }
 
-func getMe(ctx context.Context, c *Client, token any) {
-	host := viper.GetString("MONGO.HOST")
-	port := viper.GetInt("MONGO.PORT")
-	database := viper.GetString("MONGO.DATABASE")
-	if err := stores.Setup(context.Background(), host, port, "", "", database); err != nil {
-		slog.Error("failed to setup stores", "error", err)
-		return
-	}
+type MembersCollection struct {
+	*mongo.Collection
+}
 
+func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 	cr := CommandResponse{
 		Thing:  "members",
 		Action: "me",
 	}
-	defer func() {
-		j, _ := json.Marshal(cr)
-		c.send <- j
-	}()
 
 	uAccess := ctx.Value(contextKeyAccess).(userAccess)
 
 	logger := slog.With("token", uAccess.Token)
 	logger.Info("creating new user access")
 
-	redirectURI := viper.GetString("DISCORD.REDIRECT_URI")
-	clientId := viper.GetString("DISCORD.CLIENT_ID")
-	clientSecret := viper.GetString("DISCORD.CLIENT_SECRET")
+	member := &solmembers.Member{}
 
-	logger = logger.With("redirect_uri", redirectURI, "client_id", clientId, "client_secret", clientSecret)
-
-	logger.Debug("sending auth request")
-
-	req, err := http.NewRequest("GET", "https://discord.com/api/v10/oauth2/@me", nil)
+	discordUserMap, err := getDiscordMe(uAccess)
 	if err != nil {
-		logger.Error("failed to create request", "error", err)
+		if err.Error() != "invalid_grant" {
+			logger.Error("failed to get user", "error", err)
+			cr.Error = "internal_error"
+		}
+
 		cr.Error = err.Error()
-		return
+		return cr
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", uAccess.Token))
 
-	logger.Debug("req for @me to discord")
+	member.Id = discordUserMap["id"].(string)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	member, err = solmembers.Get(member.Id)
 	if err != nil {
-		logger.Error("failed to send request", "error", err)
-		cr.Error = err.Error()
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		logger.Error("unauthorized", "status", resp.StatusCode)
-		cr.Error = "invalid_grant"
-		return
-	}
-
-	if resp.StatusCode == http.StatusBadRequest {
-		errorMessage, _ := io.ReadAll(resp.Body)
-		type ErrorMessage struct {
-			ErrorType   string `json:"error"`
-			Description string `json:"error_description"`
-		}
-		errMsg := ErrorMessage{}
-		if err := json.Unmarshal(errorMessage, &errMsg); err != nil {
-			cr.Error = err.Error()
-			return
-		}
-		cr.Error = errMsg.Description
-		return
-	}
-
-	res := map[string]interface{}{}
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		logger.Error("failed to decode access", "error", err)
-		cr.Error = err.Error()
-		return
-	}
-	userMap := res["user"].(map[string]interface{})
-
-	user := &users.User{}
-
-	user.ID = userMap["id"].(string)
-
-	if err := stores.Users.Get(user.ID).Decode(user); err != nil {
 		if !errors.Is(err, mongo.ErrNoDocuments) {
 			logger.Error("failed to get user", "error", err)
-			cr.Error = err.Error()
-			return
+			cr.Error = "internal_error"
+			return cr
 		}
 
-		user.ID = userMap["id"].(string)
-		user.Name = userMap["username"].(string)
-		user.Rank = ranks.Guest
-		avatar, ok := userMap["avatar"].(string)
+		member.Id = discordUserMap["id"].(string)
+		member.Name = discordUserMap["username"].(string)
+		member.Rank = ranks.None
+		avatar, ok := discordUserMap["avatar"].(string)
 		if !ok {
 			avatar = ""
 		}
-		user.Avatar = avatar
+		member.Avatar = avatar
 
-		cr.Result = user
-		return
+		cr.Result = member
+		return cr
 	}
 
-	if user.Avatar == "" {
-		user.Avatar = userMap["avatar"].(string)
+	if member.Avatar == "" {
+		member.Avatar = discordUserMap["avatar"].(string)
 
-		if err := stores.Users.Update(user.ID, user); err != nil {
-			logger.Error("failed to update user", "error", err)
-			cr.Error = err.Error()
-			return
+		if err := member.Save(); err != nil {
+			logger.Error("failed to save member", "error", err)
+			cr.Error = "internal_error"
+			return cr
 		}
+
+		// if err := membersCollection.UpdateMember(ctx, user); err != nil {
+		// 	logger.Error("failed to update user", "error", err)
+		// 	cr.Error = "internal_error"
+		// 	return cr
+		// }
 	}
 
-	cr.Result = user
+	cr.Result = member
+
+	return cr
 }
 
-func getMembers(ctx context.Context, c *Client, arg any) {
-	uAccess := ctx.Value(contextKeyAccess).(userAccess)
-	_ = uAccess
-	members := []*users.User{
-		{
-			ID:   "1",
-			Name: "KooTheGreat",
-			Rank: ranks.Admiral,
-		},
-		{
-			ID:   "2",
-			Name: "KooTheGreat2",
-			Rank: ranks.Admiral,
-		},
-	}
+func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
+
+	logger := slog.Default()
+
+	member := ctx.Value(contextKeyMember).(*solmembers.Member)
 
 	cr := CommandResponse{
 		Thing:  "members",
-		Result: members,
+		Action: "list",
 	}
 
-	j, _ := json.Marshal(cr)
+	if arg == "undefined" {
+		cr.Result = []*users.User{}
+		return cr
+	}
 
-	c.send <- j
+	if member.Rank > ranks.Lieutenant {
+		cr.Error = "unauthorized"
+		return cr
+	}
+
+	page, err := strconv.Atoi(arg.(string))
+	if err != nil {
+		logger.Error("failed to parse page", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	members, err := solmembers.List(page)
+	if err != nil {
+		logger.Error("failed to list users", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	cr.Result = members
+
+	return cr
 }

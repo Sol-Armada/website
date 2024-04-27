@@ -14,10 +14,23 @@ import { createVuetify } from 'vuetify'
 import { aliases, fa } from 'vuetify/iconsets/fa'
 import { mdi } from 'vuetify/iconsets/mdi'
 
+const rankColors = {
+  admiral: '#1E52E6',
+  commander: '#308CA7',
+  lieutenant: '#24AD32',
+  specialist: '#DA5C5C',
+  technician: '#E69737',
+  member: '#FFC900',
+  recruit: '#1CFAC0',
+  guest: '#929292',
+  ally: '#F87847',
+  bot: '#206694',
+}
+
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
   icons: {
-    defaultSet: 'mdi',
+    defaultSet: 'fa',
     aliases,
     sets: {
       fa,
@@ -27,7 +40,7 @@ export default createVuetify({
   theme: {
     defaultTheme: 'dark',
     variations: {
-      colors: ['surface'],
+      colors: ['surface', 'commander'],
       lighten: 4,
       darken: 4
     },
@@ -61,12 +74,11 @@ export default createVuetify({
 
           'surface-bright': '#FFFFFF',
           'surface-light': '#EEEEEE',
-          'surface-variant': '#ede1cf',
           'discord-primary': '#5865F2',
           info: '#2196F3',
           success: '#4CAF50',
           warning: '#FB8C00',
-          'discord-primary': '#5865F2',
+          ...rankColors
         }
       },
       'dark': {
@@ -93,17 +105,17 @@ export default createVuetify({
           surface: '#001d31',
           'on-surface': '#cde5ff',
           outline: '#998f80',
-          'surface-variant': '#4d4639',
+          'surface-variant': '#ede1cf',
           'on-surface-variant': '#d1c5b4',
 
           'surface-bright': '#FFFFFF',
           'surface-light': '#EEEEEE',
-          'surface-variant': '#ede1cf',
           'discord-primary': '#5865F2',
           info: '#2196F3',
           success: '#4CAF50',
           warning: '#FB8C00',
-          'discord-primary': '#5865F2',
+          'card-on-surface': '1e3048',
+          ...rankColors
         }
       }
     }

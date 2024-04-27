@@ -1,26 +1,31 @@
 import { defineStore } from "pinia"
 import { useConnectionStore } from "./connection"
-import { Member } from "./classes"
+import { Attendance } from "./classes"
 import { useErrorStore } from "./error"
 
-export const useMembersStore = defineStore("members", {
+export const useAttendanceStore = defineStore("attendance", {
     actions: {
-        async getMembers(page) {
+        async getAttendanceRecords(page) {
             return new Promise((resolve) => {
                 const errorStore = useErrorStore()
                 const connectionStore = useConnectionStore()
-                connectionStore.addListener('members', 'list', (commandResponse) => {
+                connectionStore.addListener('attendance', 'list', (commandResponse) => {
                     // handle errors
                     if (commandResponse.error) {
                         errorStore.$patch({ error: commandResponse.error, show: true })
                         return
                     }
 
-                    resolve(commandResponse.result.map((m) => new Member(m)))
+                    if (!commandResponse.result) {
+                        resolve([])
+                        return
+                    }
+
+                    resolve(commandResponse.result.map((a) => new Attendance(a)))
                 })
 
                 setTimeout(() => {
-                    connectionStore.send('members', 'list', page)
+                    connectionStore.send('attendance', 'list', page)
                 }, 500)
             })
         }

@@ -12,6 +12,11 @@ export const useConnectionStore = defineStore("connection", () => {
     const appStore = useAppStore()
 
     function bindEvents() {
+        if (isConnected.value) {
+            console.log("already connected")
+            return
+        }
+
         this.connect()
     }
 
@@ -46,29 +51,26 @@ export const useConnectionStore = defineStore("connection", () => {
     }
 
     function send(command, action, arg, attempts = 0) {
-        console.log(command + "|" + action + ":" + arg + ":" + useAppStore().token)
-        let sent = false
         if (isConnected.value) {
             socket.value.send(command + "|" + action + ":" + arg + ":" + useAppStore().token)
-            sent = true
             return
         }
         setTimeout(() => {
-            if (sent) {
-                return
-            }
-
-            if (attempts < 5) {
-                send(command, action, arg, attempts + 1)
-            }
+            console.log("Attemping command again... (" + attempts + ")")
+            send(command, action, arg, attempts + 1)
         }, 1000)
     }
 
-    function addListener(thing, callback) {
+    function addListener(thing, action, callback) {
         socket.value.addEventListener("message", (event) => {
             const commandResponse = new CommandResponse(event.data)
 
-            if (commandResponse.thing === thing) {
+            if (commandResponse.error == 'invalid_grant') {
+                appStore.logout()
+                return
+            }
+
+            if (commandResponse.thing === thing && commandResponse.action === action) {
                 callback(commandResponse)
             }
         })
