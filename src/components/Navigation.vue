@@ -28,7 +28,6 @@
             </v-list-item>
             <v-divider></v-divider>
             <v-list-item link title="Home" to="/"></v-list-item>
-            <v-list-item link title="Handbook" to="/handbook"></v-list-item>
             <div v-if="me && me.rank.id <= 3">
                 <v-divider></v-divider>
                 <v-list-item link title="Members" to="/members"></v-list-item>

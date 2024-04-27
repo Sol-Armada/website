@@ -74,12 +74,10 @@ export default createVuetify({
 
           'surface-bright': '#FFFFFF',
           'surface-light': '#EEEEEE',
-          'surface-variant': '#ede1cf',
           'discord-primary': '#5865F2',
           info: '#2196F3',
           success: '#4CAF50',
           warning: '#FB8C00',
-          'discord-primary': '#5865F2',
           ...rankColors
         }
       },
@@ -107,17 +105,15 @@ export default createVuetify({
           surface: '#001d31',
           'on-surface': '#cde5ff',
           outline: '#998f80',
-          'surface-variant': '#4d4639',
+          'surface-variant': '#ede1cf',
           'on-surface-variant': '#d1c5b4',
 
           'surface-bright': '#FFFFFF',
           'surface-light': '#EEEEEE',
-          'surface-variant': '#ede1cf',
           'discord-primary': '#5865F2',
           info: '#2196F3',
           success: '#4CAF50',
           warning: '#FB8C00',
-          'discord-primary': '#5865F2',
           'card-on-surface': '1e3048',
           ...rankColors
         }
