@@ -43,7 +43,7 @@ func main() {
 		ReportTimestamp: true,
 		TimeFormat:      time.DateTime,
 	}
-	if viper.GetString("LOG.LEVEL") == "DEBUG" {
+	if viper.GetBool("LOG.DEBUG") {
 		opts.Level = log.DebugLevel
 	}
 
@@ -54,7 +54,7 @@ func main() {
 	echoLogger := slog.Default()
 
 	// set slog output to file if not local
-	if !viper.GetBool("LOCAL") {
+	if !viper.GetBool("LOG.CLI") {
 		opts.Formatter = log.JSONFormatter
 		opts.TimeFormat = time.RFC3339
 
