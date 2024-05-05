@@ -13,15 +13,34 @@ export const useAppStore = defineStore('app', () => {
     const me = ref(null)
     const onboarded = ref(false)
 
+    const version = ref(null)
+
     function bindEvents() {
         loggedIn.value = localStorage.getItem('logged_in')
         me.value = JSON.parse(localStorage.getItem('me'))
         token.value = localStorage.getItem('token')
         onboarded.value = localStorage.getItem('onboarded')
+        version.value = localStorage.getItem('version')
 
-        // if (me.value == null) {
-        //     getMe()
-        // }
+        connectionStore.addListener('version', 'check').then((commandResponse) => {
+            // handle errors
+            if (commandResponse.error) {
+                errorStore.$patch({ error: commandResponse.error, show: true })
+                return
+            }
+            console.log("version", commandResponse.result)
+            if (version.value && commandResponse.result != version.value) {
+                logout()
+            }
+
+            localStorage.setItem('version', commandResponse.result)
+        }).catch((error) => {
+            if (error == 'invalid_access') {
+                logout()
+            }
+        })
+
+        connectionStore.send('version', 'check')
     }
     async function login(code) {
         return new Promise((resolve, reject) => {

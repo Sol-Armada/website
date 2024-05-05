@@ -32,11 +32,11 @@ export const useConnectionStore = defineStore("connection", () => {
                 errorStore.reset()
             }
 
-            console.log("Connected")
+            console.log("connected")
         }
 
         socket.value.onclose = () => {
-            console.log("Reconnecting...")
+            console.log("reconnecting...")
 
             isConnected.value = false
 
@@ -67,7 +67,6 @@ export const useConnectionStore = defineStore("connection", () => {
                 const commandResponse = new CommandResponse(event.data)
 
                 if (commandResponse.error) {
-                    // appStore.logout()
                     reject(commandResponse.error)
                     return
                 }

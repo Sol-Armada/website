@@ -93,7 +93,8 @@ func (h *Hub) run() {
 					continue
 				}
 				if err := json.Unmarshal([]byte(uAccessRaw), &access); err != nil {
-					command.Client.send <- []byte(err.Error())
+					r := CommandResponse{Thing: command.Thing, Action: command.Action, Error: "invalid_access"}
+					command.Client.send <- r.ToJsonBytes()
 					continue
 				}
 
@@ -123,6 +124,10 @@ func (h *Hub) run() {
 				res = contractsActions[command.Action](ctx, command.Client, command.Arg)
 			case "attendance":
 				res = attendanceActions[command.Action](ctx, command.Client, command.Arg)
+			case "version":
+				if command.Action == "check" {
+					res = CommandResponse{Thing: command.Thing, Action: command.Action, Result: version}
+				}
 			}
 
 			if res.Error != "" {

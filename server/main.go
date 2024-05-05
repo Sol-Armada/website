@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "local"
+var version = "local2"
 var hash = "local"
 
 var ctx = context.Background()
