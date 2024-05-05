@@ -50,15 +50,12 @@ export const useConnectionStore = defineStore("connection", () => {
         }
     }
 
-    function send(command, action, arg, attempts = 0) {
-        if (isConnected.value) {
-            socket.value.send(command + "|" + action + ":" + arg + ":" + useAppStore().token)
-            return
+    async function send(command, action, arg) {
+        while (isConnected.value == false) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
         }
-        setTimeout(() => {
-            console.log("Attemping command again... (" + attempts + ")")
-            send(command, action, arg, attempts + 1)
-        }, 1000)
+
+        socket.value.send(command + "|" + action + ":" + arg + ":" + appStore.token)
     }
 
     async function addListener(thing, action) {

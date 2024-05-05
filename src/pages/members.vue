@@ -93,19 +93,18 @@ function swipe(direction) {
 }
 
 onMounted(async () => {
-    let m = []
+    membersPage.value = 1
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        loadingText.value = `Loading members... (${m.length})`
-        let moreMembers = await memberStore.getMembers(membersPage.value)
-        m = m.concat(moreMembers)
+        loadingText.value = `Loading members... (${members.value.length})`
+        const moreMembers = await memberStore.getMembers(membersPage.value)
         if (moreMembers.length == 0) {
             console.log("no more members")
             loading.value = false
             break
         }
+        members.value.push(...moreMembers)
         membersPage.value += 1
-        members.value = m
     }
 })
 

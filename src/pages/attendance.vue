@@ -74,8 +74,8 @@ const loadingText = ref('Loading attendance records... 0')
 const headers = [
     { title: 'Name', key: 'name' },
     { title: 'Member Count', key: 'memberCount' },
-    {title: 'Submitted by', key: 'submittedBy'},
-    {title: 'Recorded', key: 'recorded'}
+    { title: 'Submitted by', key: 'submittedBy' },
+    { title: 'Recorded', key: 'recorded' }
 ]
 const attendanceRecords = ref([])
 const attendanceRecordsPage = ref(1)
@@ -105,19 +105,18 @@ function swipe(direction) {
 }
 
 onMounted(async () => {
-    let a = []
+    attendanceRecordsPage.value = 1
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        loadingText.value = `Loading attendance records... (${a.length})`
-        let moreAttendanceRecords = await attendanceStore.getAttendanceRecords(attendanceRecordsPage.value)
-        a = a.concat(moreAttendanceRecords)
-        if (moreAttendanceRecords.length == 0) {
+        loadingText.value = `Loading attendance records... (${attendanceRecords.value.length})`
+        const moreMembers = await attendanceStore.getAttendanceRecords(attendanceRecordsPage.value)
+        if (moreMembers.length == 0) {
             console.log("no more attendance records")
             loading.value = false
             break
         }
+        attendanceRecords.value.push(...moreMembers)
         attendanceRecordsPage.value += 1
-        attendanceRecords.value = a
     }
 })
 

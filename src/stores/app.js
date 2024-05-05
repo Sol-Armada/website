@@ -28,7 +28,6 @@ export const useAppStore = defineStore('app', () => {
                 errorStore.$patch({ error: commandResponse.error, show: true })
                 return
             }
-            console.log("version", commandResponse.result)
             if (version.value && commandResponse.result != version.value) {
                 logout()
             }
