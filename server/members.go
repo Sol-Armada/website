@@ -149,13 +149,15 @@ func updateMe(ctx context.Context, c *Client, arg any) CommandResponse {
 	}
 
 	me := ctx.Value(contextKeyMember).(*solmembers.Member)
-	_ = me
+
 	updatesMap := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(arg.(string)), &updatesMap); err != nil {
 		logger.Error("failed to parse me", "error", err)
 		cr.Error = "internal_error"
 		return cr
 	}
+
+	logger = logger.With("updates", updatesMap)
 
 	logger.Debug("updating me")
 

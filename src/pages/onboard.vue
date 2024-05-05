@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useTheme } from 'vuetify'
 
@@ -117,6 +117,10 @@ const gameplayList = [
 ]
 const chosenGameplay = ref([])
 
+watch(chosenGameplay, () => {
+    console.log(chosenGameplay.value)
+})
+
 // debounce rsi handle input
 let timeout = null
 function debounce() {
@@ -138,7 +142,7 @@ function submit(event) {
     appStore.me.playtime = yearsPlaying.value
     const gamePlay = []
     for (let i = 0; i < chosenGameplay.value.length; i++) {
-        gamePlay.push(chosenGameplay.value[i].value)
+        gamePlay.push(chosenGameplay.value[i])
     }
     appStore.me.gameplay = gamePlay
 

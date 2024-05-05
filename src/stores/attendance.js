@@ -22,6 +22,8 @@ export const useAttendanceStore = defineStore("attendance", {
                     }
 
                     resolve(commandResponse.result.map((a) => new Attendance(a)))
+                }).catch((error) => {
+                    console.log(error)
                 })
 
                 setTimeout(() => {
