@@ -65,9 +65,9 @@
 
                                 <v-row class="justify-center">
                                     <v-col cols="12">
-                                        <v-combobox chips multiple v-model="chosenGameplay"
-                                            label="What gameplay are you most interested in?"
-                                            :items="gameplayList"></v-combobox>
+                                        <v-select chips multiple hide-selected v-model="chosenGameplay"
+                                            label="What gameplay are you interested in?"
+                                            :items="gameplayList"></v-select>
                                     </v-col>
                                 </v-row>
 

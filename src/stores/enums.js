@@ -1,8 +1,8 @@
 export const Ranks = {
     0: {
         id: 0,
-        name: "Bot",
-        short: "BOT",
+        name: "None",
+        short: "NIL",
         color: "bot",
     },
     1: {

@@ -20,6 +20,10 @@ export const Member = class Member {
         this.eventsAttended = memberJson.legacy_events
         this.validated = memberJson.validated
         this.avatar = memberJson.avatar
+        this.isGuest = memberJson.is_guest
+        this.isBot = memberJson.is_bot
+        this.isAlly = memberJson.is_ally
+        this.isAffiliate = memberJson.is_affiliate
 
         this.age = memberJson.age
         this.playTime = memberJson.playtime
@@ -28,27 +32,26 @@ export const Member = class Member {
         this.onboarded_at = memberJson.onboarded_at ? new Date(memberJson.onboarded_at) : null
     }
 
-    /** @type {string} */
-    static id
-    /** @type {string} */
-    static name
-    /** @type {Object} */
-    static rank
-    /** @type {number} */
-    static eventsAttended
-    /** @type {bool} */
-    static validated
-    /** @type {string} */
-    static avatar
-    /** @type {Date} */
-    static onboarded_at
-
     get officer() {
         return this.isOfficer()
     }
 
     isOfficer() {
         return this.rank.id <= 3
+    }
+
+    get isMember() {
+        return !this.isGuest && !this.isBot && !this.isAlly && !this.isAffiliate
+    }
+
+    get affiliation() {
+        if (this.isAlly) {
+            return "Ally"
+        } else if (this.isAffiliate) {
+            return "Affiliate"
+        } else {
+            return "Guest"
+        }
     }
 }
 

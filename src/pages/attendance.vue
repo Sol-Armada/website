@@ -120,12 +120,6 @@ onMounted(async () => {
     }
 })
 
-// async function load() {
-//     page.value += 1
-//     const moreMembers = await memberStore.getMembers(page.value)
-//     members.value = members.value.concat(moreMembers)
-// }
-
 </script>
 <style lang="scss">
 #attendance-records .v-data-table-footer__items-per-page {

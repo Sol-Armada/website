@@ -13,7 +13,7 @@
                                 variant="outlined" hide-details single-line></v-text-field>
                         </template>
                         <v-container fluid :style="{ height: '100%' }">
-                            <v-data-table id="members" class="bg-card-on-surface" :items="members"
+                            <v-data-table id="members" class="bg-card-on-surface" :items="sortedMembers"
                                 :disable-items-per-page=true :headers="headers" density="compact" :search="search"
                                 :loading="loading" :itemsPerPageOptions="[12]" :loading-text="loadingText" color="white"
                                 v-model:page="page" v-touch="{
@@ -21,7 +21,7 @@
                                     right: () => swipe('Right')
                                 }">
                                 <template v-slot:item="{ item }">
-                                    <tr>
+                                    <tr :id="item.id">
                                         <td width="33.33%">
                                             <v-col cols="12">
                                                 <v-card :border="item.rank.color + ' s-xl'">
@@ -29,10 +29,11 @@
                                                 </v-card>
                                             </v-col>
                                         </td>
-                                        <td width="33.33%">
+                                        <td width="25%">
                                             <v-col cols="12">
                                                 <v-card>
-                                                    <v-card-text>{{ item.rank.name }}</v-card-text>
+                                                    <v-card-text>{{ !item.isMember ? item.affiliation :
+                                                        item.rank.name }}</v-card-text>
                                                 </v-card>
                                             </v-col>
                                         </td>
@@ -40,6 +41,13 @@
                                             <v-col cols="12">
                                                 <v-card>
                                                     <v-card-text>{{ item.eventsAttended }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.validated ? 'Yes' : 'No' }}</v-card-text>
                                                 </v-card>
                                             </v-col>
                                         </td>
@@ -64,8 +72,83 @@ const memberStore = useMembersStore()
 const loading = ref(true)
 const loadingText = ref('Loading members... 0')
 
-const headers = [{ title: 'Name', key: 'name' }, { title: 'Rank', key: 'rank.name' }, { title: 'Events Attended', key: 'eventsAttended' }]
+const headers = [{ title: 'Name', key: 'name' }, { title: 'Rank', key: 'rank.name' }, { title: 'Events Attended', key: 'eventsAttended' }, { title: "Validated", key: "validated" }]
 const members = ref([])
+// sort members with rank 0 being on bottom
+const sortedMembers = computed(() => {
+    let m = members.value
+    return m.sort((a, b) => {
+        if (a.rank.id < b.rank.id) {
+            if (a.rank.id == 0) {
+                return 1
+            }
+
+            return -1
+        }
+
+        if (a.rank.id > b.rank.id) {
+            if (b.rank.id == 0) {
+                return -1
+            }
+
+            return 1
+        }
+
+        if (a.rank.id == b.rank.id) {
+            // affiliate
+            if (a.isAffiliate) {
+                if (!b.isAffiliate) {
+                    return 1
+                }
+
+                return -1
+            }
+
+            if (b.isAffiliate) {
+                if (!a.isAffiliate) {
+                    return -1
+                }
+
+                return 1
+            }
+
+            if (a.isAffiliate && b.isAffiliate) {
+                return 0
+            }
+
+            // ally
+            if (a.isAlly) {
+                if (!b.isAlly) {
+                    return 1
+                }
+
+                return -1
+            }
+
+            if (b.isAlly) {
+                if (!a.isAlly) {
+                    return -1
+                }
+
+                return 1
+            }
+
+            if (a.isAlly && b.isAlly) {
+                return 0
+            }
+        }
+
+        if (a.name < b.name) {
+            return -1
+        }
+
+        if (a.name > b.name) {
+            return 1
+        }
+
+        return 0
+    })
+})
 const membersPage = ref(0)
 const page = ref(1)
 const search = ref('')
@@ -107,12 +190,6 @@ onMounted(async () => {
         membersPage.value += 1
     }
 })
-
-// async function load() {
-//     page.value += 1
-//     const moreMembers = await memberStore.getMembers(page.value)
-//     members.value = members.value.concat(moreMembers)
-// }
 
 </script>
 <style lang="scss">
