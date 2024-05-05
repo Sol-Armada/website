@@ -33,6 +33,11 @@ func authenticate(ctx context.Context, c *Client, arg any) CommandResponse {
 
 	code := arg.(string)
 
+	if code == "null" {
+		cr.Error = "no_code"
+		return cr
+	}
+
 	logger := slog.Default().With("code", code)
 	logger.Info("creating new user access")
 

@@ -9,7 +9,7 @@ export const useMembersStore = defineStore("members", {
             return new Promise((resolve) => {
                 const errorStore = useErrorStore()
                 const connectionStore = useConnectionStore()
-                connectionStore.addListener('members', 'list', (commandResponse) => {
+                connectionStore.addListener('members', 'list').then((commandResponse) => {
                     // handle errors
                     if (commandResponse.error) {
                         errorStore.$patch({ error: commandResponse.error, show: true })
@@ -17,6 +17,8 @@ export const useMembersStore = defineStore("members", {
                     }
 
                     resolve(commandResponse.result.map((m) => new Member(m)))
+                }).catch((error) => {
+                    console.log(error)
                 })
 
                 setTimeout(() => {

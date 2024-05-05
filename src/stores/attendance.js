@@ -9,7 +9,7 @@ export const useAttendanceStore = defineStore("attendance", {
             return new Promise((resolve) => {
                 const errorStore = useErrorStore()
                 const connectionStore = useConnectionStore()
-                connectionStore.addListener('attendance', 'list', (commandResponse) => {
+                connectionStore.addListener('attendance', 'list').then((commandResponse) => {
                     // handle errors
                     if (commandResponse.error) {
                         errorStore.$patch({ error: commandResponse.error, show: true })

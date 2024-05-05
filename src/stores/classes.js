@@ -20,6 +20,12 @@ export const Member = class Member {
         this.eventsAttended = memberJson.legacy_events
         this.validated = memberJson.validated
         this.avatar = memberJson.avatar
+
+        this.age = memberJson.age
+        this.playTime = memberJson.playtime
+        this.validated = memberJson.validated
+        this.gameplay = memberJson.gameplay
+        this.onboarded_at = memberJson.onboarded_at ? new Date(memberJson.onboarded_at) : null
     }
 
     /** @type {string} */
@@ -32,6 +38,10 @@ export const Member = class Member {
     static eventsAttended
     /** @type {bool} */
     static validated
+    /** @type {string} */
+    static avatar
+    /** @type {Date} */
+    static onboarded_at
 
     get officer() {
         return this.isOfficer()

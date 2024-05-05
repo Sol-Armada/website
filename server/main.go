@@ -51,6 +51,10 @@ func main() {
 
 	logger := slog.New(handler)
 
+	logger.Debug("starting server")
+
+	slog.SetDefault(logger)
+
 	echoLogger := slog.Default()
 
 	// set slog output to file if not local

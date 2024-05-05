@@ -61,19 +61,23 @@ export const useConnectionStore = defineStore("connection", () => {
         }, 1000)
     }
 
-    function addListener(thing, action, callback) {
-        socket.value.addEventListener("message", (event) => {
-            const commandResponse = new CommandResponse(event.data)
+    async function addListener(thing, action) {
+        return new Promise((resolve, reject) => {
+            socket.value.addEventListener("message", (event) => {
+                const commandResponse = new CommandResponse(event.data)
 
-            if (commandResponse.error == 'invalid_grant') {
-                appStore.logout()
-                return
-            }
+                if (commandResponse.error) {
+                    // appStore.logout()
+                    reject(commandResponse.error)
+                    return
+                }
 
-            if (commandResponse.thing === thing && commandResponse.action === action) {
-                callback(commandResponse)
-            }
+                if (commandResponse.thing === thing && commandResponse.action === action) {
+                    resolve(commandResponse)
+                }
+            })
         })
+
     }
 
     return {

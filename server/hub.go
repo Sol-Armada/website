@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"slices"
 
 	"github.com/sol-armada/sol-bot/members"
 )
@@ -82,8 +83,10 @@ func (h *Hub) run() {
 
 			logger.Info("received command", slog.String("thing", command.Thing), slog.String("action", command.Action))
 
+			excludeCommands := []string{"auth", "login", "rsi"}
+
 			var access userAccess
-			if command.Token != "" && command.Token != "null" && command.Action != "auth" {
+			if command.Token != "" && command.Token != "null" && !slices.Contains(excludeCommands, command.Action) && !slices.Contains(excludeCommands, command.Thing) {
 				uAccessRaw, err := decrypt(command.Token)
 				if err != nil {
 					command.Client.send <- []byte(err.Error())
@@ -110,6 +113,8 @@ func (h *Hub) run() {
 			var res CommandResponse
 
 			switch command.Thing {
+			case "rsi":
+				res = rsiActions[command.Action](ctx, command.Client, command.Arg)
 			case "members":
 				res = membersActions[command.Action](ctx, command.Client, command.Arg)
 			case "login":
@@ -118,6 +123,10 @@ func (h *Hub) run() {
 				res = contractsActions[command.Action](ctx, command.Client, command.Arg)
 			case "attendance":
 				res = attendanceActions[command.Action](ctx, command.Client, command.Arg)
+			}
+
+			if res.Error != "" {
+				logger.Error("failed to execute command", "error", res.Error)
 			}
 
 			command.Client.send <- res.ToJsonBytes()

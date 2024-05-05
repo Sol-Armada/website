@@ -14,19 +14,19 @@ const connectionStore = useConnectionStore()
 connectionStore.bindEvents()
 appStore.bindEvents()
 
-appStore.$subscribe((mutation, state) => {
-    if (!state.loggedIn || !state.token) {
-        // redirect to login if not logged in
-        if (window.location.pathname != "/login") {
-            window.location.href = "/login"
-        }
-    }
+// appStore.$subscribe((mutation, state) => {
+//     if (!state.loggedIn || !state.token) {
+//         // redirect to login if not logged in
+//         if (window.location.pathname != "/login") {
+//             window.location.href = "/login"
+//         }
+//     }
 
-    if (state.loggedIn && state.token) {
-        // redirect to home if already logged in
-        if (window.location.pathname == "/login") {
-            window.location.href = "/"
-        }
-    }
-})
+//     if (state.loggedIn && state.token) {
+//         // redirect to home if already logged in
+//         if (window.location.pathname == "/login") {
+//             window.location.href = "/"
+//         }
+//     }
+// })
 </script>

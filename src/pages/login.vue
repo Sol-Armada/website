@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-container class="fill-height">
         <v-responsive class="align-centerfill-height mx-auto" max-width="900">
@@ -40,13 +41,26 @@ const theme = useTheme()
 const logoColor = ref("blue")
 const code = ref(new URLSearchParams(window.location.search).get('code'))
 
-// get the code from the query params
-const urlParams = new URLSearchParams(window.location.search)
-
 onMounted(() => {
     // if the theme is dark, set the logo to white
     if (theme.name.value == "dark") {
         logoColor.value = "white"
+    }
+
+    if (code.value) {
+        appStore.login(code.value).then((res) => {
+            if (res) {
+                console.log("LOGGED IN")
+                appStore.getMe().then(() => {
+                    console.log("GOT ME")
+                    if (appStore.me && appStore.me.onboarded_at !== null) {
+                        window.location.href = "/"
+                    } else {
+                        window.location.href = "/onboard"
+                    }
+                })
+            }
+        })
     }
 })
 
@@ -54,5 +68,5 @@ onMounted(() => {
 
 <route lang="yaml">
 meta:
-  layout: login
+  layout: plain
 </route>

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sol-armada/admin/users"
@@ -13,8 +15,9 @@ import (
 )
 
 var membersActions = map[string]Action{
-	"list": getMembers,
-	"me":   getMe,
+	"list":      getMembers,
+	"me":        getMe,
+	"update-me": updateMe,
 }
 
 type MembersCollection struct {
@@ -27,7 +30,11 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 		Action: "me",
 	}
 
-	uAccess := ctx.Value(contextKeyAccess).(userAccess)
+	uAccess, ok := ctx.Value(contextKeyAccess).(userAccess)
+	if !ok {
+		cr.Error = "unauthorized"
+		return cr
+	}
 
 	logger := slog.With("token", uAccess.Token)
 	logger.Info("creating new user access")
@@ -129,6 +136,52 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 	}
 
 	cr.Result = members
+
+	return cr
+}
+
+func updateMe(ctx context.Context, c *Client, arg any) CommandResponse {
+	logger := slog.Default()
+
+	cr := CommandResponse{
+		Thing:  "members",
+		Action: "update-me",
+	}
+
+	me := ctx.Value(contextKeyMember).(*solmembers.Member)
+	_ = me
+	updatesMap := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(arg.(string)), &updatesMap); err != nil {
+		logger.Error("failed to parse me", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	logger.Debug("updating me")
+
+	me.Name = updatesMap["name"].(string)
+	me.Age = int(updatesMap["age"].(float64))
+	me.Playtime = int(updatesMap["playtime"].(float64))
+	gameplayRaw := updatesMap["gameplay"].([]interface{})
+	gameplayList := []solmembers.GameplayTypes{}
+	for _, gameplay := range gameplayRaw {
+		gameplayList = append(gameplayList, solmembers.GameplayTypes(gameplay.(string)))
+	}
+	me.Gameplay = gameplayList
+	onboardedAtRaw := updatesMap["onboarded_at"].(string)
+	onboardedAt, err := time.Parse(time.RFC3339, onboardedAtRaw)
+	if err != nil {
+		logger.Error("failed to parse onboarded_at", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+	me.OnboardedAt = &onboardedAt
+
+	if err := me.Save(); err != nil {
+		logger.Error("failed to save me", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
 
 	return cr
 }

@@ -13,6 +13,7 @@ import '@fortawesome/fontawesome-free/css/all.css'
 import { createVuetify } from 'vuetify'
 import { aliases, fa } from 'vuetify/iconsets/fa'
 import { mdi } from 'vuetify/iconsets/mdi'
+import { VNumberInput } from 'vuetify/labs/VNumberInput'
 
 const rankColors = {
   admiral: '#1E52E6',
@@ -29,6 +30,9 @@ const rankColors = {
 
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
+  components: {
+    VNumberInput,
+  },
   icons: {
     defaultSet: 'fa',
     aliases,

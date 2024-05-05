@@ -70,9 +70,13 @@ func (c *Client) readPump() {
 
 		message := string(messageBytes)
 		mSplit := strings.Split(message, "|")
+		thing := mSplit[0]
 		aSplit := strings.Split(mSplit[1], ":")
+		action := aSplit[0]
+		arg := strings.Join(aSplit[1:len(aSplit)-1], ":")
+		token := aSplit[len(aSplit)-1]
 
-		c.hub.broadcast <- &CommandRequest{Thing: mSplit[0], Action: aSplit[0], Arg: aSplit[1], Token: aSplit[2], Client: c}
+		c.hub.broadcast <- &CommandRequest{Thing: thing, Action: action, Arg: arg, Token: token, Client: c}
 	}
 }
 
