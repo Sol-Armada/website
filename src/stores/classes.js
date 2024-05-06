@@ -59,7 +59,7 @@ export const Attendance = class Attendance {
     constructor(attendanceJson) {
         this.id = attendanceJson.id
         this.name = attendanceJson.name
-        this.dateCreated = new Date(attendanceJson.dateCreated)
+        this.dateCreated = new Date(attendanceJson.date_created)
         this.members = []
         if (attendanceJson.members) {
             for (let i = 0; i < attendanceJson.members.length; i++) {
@@ -92,10 +92,16 @@ export const Attendance = class Attendance {
     static submittedBy
 
     get numberOfMembers() {
-        return this.numberOfMembers()
+        return this.members.length
     }
 
-    numberOfMembers() {
-        return this.members.length
+    get createdDate() {
+        const utcDate = new Date(this.dateCreated)
+        const options = {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }
+        return utcDate.toLocaleString(undefined, options)
     }
 }

@@ -21,7 +21,7 @@
                                     right: () => swipe('Right')
                                 }">
                                 <template v-slot:item="{ item }">
-                                    <tr>
+                                    <tr :id="item.id">
                                         <td>
                                             <v-col cols="12">
                                                 <v-card>
@@ -32,7 +32,14 @@
                                         <td>
                                             <v-col cols="12">
                                                 <v-card>
-                                                    <v-card-text>{{ item.numberOfMembers() }}</v-card-text>
+                                                    <v-card-text>{{ item.numberOfMembers }}</v-card-text>
+                                                </v-card>
+                                            </v-col>
+                                        </td>
+                                        <td>
+                                            <v-col cols="12">
+                                                <v-card>
+                                                    <v-card-text>{{ item.createdDate }}</v-card-text>
                                                 </v-card>
                                             </v-col>
                                         </td>
@@ -74,8 +81,9 @@ const loadingText = ref('Loading attendance records... 0')
 const headers = [
     { title: 'Name', key: 'name' },
     { title: 'Member Count', key: 'memberCount' },
+    { title: 'Created (UTC)', key: 'dateCreated' },
     { title: 'Submitted by', key: 'submittedBy' },
-    { title: 'Recorded', key: 'recorded' }
+    { title: 'Recorded', key: 'recorded' },
 ]
 const attendanceRecords = ref([])
 const attendanceRecordsPage = ref(1)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sol-armada/admin/users"
+	attndnc "github.com/sol-armada/sol-bot/attendance"
 	solmembers "github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/ranks"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -133,6 +134,18 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 		logger.Error("failed to list users", "error", err)
 		cr.Error = "internal_error"
 		return cr
+	}
+
+	// get attendance count
+	for _, member := range members {
+		count, err := attndnc.GetMemberAttendanceCount(member.Id)
+		if err != nil {
+			logger.Error("failed to get attendance count", "error", err)
+			cr.Error = "internal_error"
+			return cr
+		}
+
+		member.LegacyEvents = count
 	}
 
 	cr.Result = members
