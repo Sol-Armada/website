@@ -62,6 +62,8 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 			return cr
 		}
 
+		logger.Debug("member not found")
+
 		member.Id = discordUserMap["id"].(string)
 		member.Name = discordUserMap["username"].(string)
 		member.Rank = ranks.None
