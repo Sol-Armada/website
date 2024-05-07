@@ -179,6 +179,8 @@ github.com/sol-armada/sol-bot v1.5.9 h1:hpfqT5pW+jJGLu6PPlInmR/NNRDhbJemYLe6o1i+
 github.com/sol-armada/sol-bot v1.5.9/go.mod h1:aP+li2lVyYSdtBbCaAoigc1TGCP1faBo5h9CYwjDOoA=
 github.com/sol-armada/sol-bot v1.5.10 h1:zHr3z5HwGsWeS7Jd5OM1IsgtVBp46K7GtBG7paJMkNM=
 github.com/sol-armada/sol-bot v1.5.10/go.mod h1:aP+li2lVyYSdtBbCaAoigc1TGCP1faBo5h9CYwjDOoA=
+github.com/sol-armada/sol-bot v1.5.11 h1:S3FfdJAt+zL9WCuujbkh6oF+EXT/z3qOWjwvXcKkKTw=
+github.com/sol-armada/sol-bot v1.5.11/go.mod h1:aP+li2lVyYSdtBbCaAoigc1TGCP1faBo5h9CYwjDOoA=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
 github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=

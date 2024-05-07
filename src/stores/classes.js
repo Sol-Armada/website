@@ -27,7 +27,6 @@ export const Member = class Member {
 
         this.timeZone = memberJson.time_zone
         this.foundBy = memberJson.found_by
-        console.log(memberJson.recruiter)
         if (memberJson.recruiter) {
             this.recruitedBy = new Member(memberJson.recruiter)
         }
