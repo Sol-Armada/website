@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sol-armada/admin/users"
 	attndnc "github.com/sol-armada/sol-bot/attendance"
 	solmembers "github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/ranks"
@@ -98,7 +97,6 @@ func getMe(ctx context.Context, c *Client, token any) CommandResponse {
 }
 
 func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
-
 	logger := slog.Default()
 
 	member := ctx.Value(contextKeyMember).(*solmembers.Member)
@@ -109,8 +107,7 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 	}
 
 	if arg == "undefined" {
-		cr.Result = []*users.User{}
-		return cr
+		arg = "0"
 	}
 
 	if member.Rank > ranks.Lieutenant {
@@ -125,10 +122,6 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 		return cr
 	}
 
-	if page < 1 {
-		page = 1
-	}
-
 	members, err := solmembers.List(page)
 	if err != nil {
 		logger.Error("failed to list users", "error", err)
@@ -137,6 +130,7 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 	}
 
 	// get attendance count
+	memberCounts := map[string]int{}
 	for _, member := range members {
 		count, err := attndnc.GetMemberAttendanceCount(member.Id)
 		if err != nil {
@@ -145,10 +139,13 @@ func getMembers(ctx context.Context, c *Client, arg any) CommandResponse {
 			return cr
 		}
 
-		member.LegacyEvents = count
+		memberCounts[member.Id] = count
 	}
 
-	cr.Result = members
+	cr.Result = map[string]interface{}{
+		"members":      members,
+		"event_counts": memberCounts,
+	}
 
 	return cr
 }
@@ -175,18 +172,40 @@ func updateMe(ctx context.Context, c *Client, arg any) CommandResponse {
 	logger.Debug("updating me")
 
 	me.Name = updatesMap["name"].(string)
+
+	// onboarding stuff
 	me.Age = int(updatesMap["age"].(float64))
-	me.Playtime = int(updatesMap["playtime"].(float64))
-	gameplayRaw := updatesMap["gameplay"].([]interface{})
-	gameplayList := []solmembers.GameplayTypes{}
-	for _, gameplay := range gameplayRaw {
-		gameplayList = append(gameplayList, solmembers.GameplayTypes(gameplay.(string)))
+	me.Playtime = int(updatesMap["playTime"].(float64))
+	if rawGameplayList, ok := updatesMap["gameplay"].([]interface{}); ok {
+		gameplayList := []solmembers.GameplayType{}
+		for _, rawGameplay := range rawGameplayList {
+			gameplayList = append(gameplayList, solmembers.ToGameplayType(rawGameplay.(string)))
+		}
+		me.Gameplay = gameplayList
 	}
-	me.Gameplay = gameplayList
-	onboardedAtRaw := updatesMap["onboarded_at"].(string)
+	me.TimeZone = updatesMap["timeZone"].(string)
+	me.FoundBy = updatesMap["foundBy"].(string)
+	me.Other = ""
+	me.Recruiter = nil
+
+	switch me.FoundBy {
+	case "other":
+		me.Other = updatesMap["other"].(string)
+	case "recruited":
+		recruiter, err := solmembers.Get(updatesMap["recruitedBy"].(string))
+		if err != nil {
+			logger.Error("failed to get recruiter", "error", err)
+			cr.Error = "internal_error"
+			return cr
+		}
+
+		me.Recruiter = recruiter
+	}
+
+	onboardedAtRaw := updatesMap["onboardedAt"].(string)
 	onboardedAt, err := time.Parse(time.RFC3339, onboardedAtRaw)
 	if err != nil {
-		logger.Error("failed to parse onboarded_at", "error", err)
+		logger.Error("failed to parse onboardedAt", "error", err)
 		cr.Error = "internal_error"
 		return cr
 	}

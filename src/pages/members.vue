@@ -182,7 +182,7 @@ onMounted(async () => {
         loadingText.value = `Loading members... (${members.value.length})`
         const moreMembers = await memberStore.getMembers(membersPage.value)
         if (moreMembers.length == 0) {
-            console.log("no more members")
+            console.debug("no more members")
             loading.value = false
             break
         }

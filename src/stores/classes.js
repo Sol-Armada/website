@@ -17,7 +17,7 @@ export const Member = class Member {
         this.id = memberJson.id
         this.name = memberJson.name
         this.rank = Ranks[memberJson.rank]
-        this.eventsAttended = memberJson.legacy_events
+        this.eventsAttended = memberJson.eventsAttended
         this.validated = memberJson.validated
         this.avatar = memberJson.avatar
         this.isGuest = memberJson.is_guest
@@ -25,18 +25,25 @@ export const Member = class Member {
         this.isAlly = memberJson.is_ally
         this.isAffiliate = memberJson.is_affiliate
 
+        this.timeZone = memberJson.time_zone
+        this.foundBy = memberJson.found_by
+        console.log(memberJson.recruiter)
+        if (memberJson.recruiter) {
+            this.recruitedBy = new Member(memberJson.recruiter)
+        }
         this.age = memberJson.age
         this.playTime = memberJson.playtime
         this.validated = memberJson.validated
         this.gameplay = memberJson.gameplay
-        this.onboarded_at = memberJson.onboarded_at ? new Date(memberJson.onboarded_at) : null
+        this.onboardedAt = memberJson.onboarded_at ? new Date(memberJson.onboarded_at) : null
+        this.other = memberJson.other
     }
 
-    get officer() {
-        return this.isOfficer()
+    get onboarded() {
+        return this.onboardedAt !== null
     }
 
-    isOfficer() {
+    get isOfficer() {
         return this.rank.id <= 3
     }
 
@@ -75,21 +82,6 @@ export const Attendance = class Attendance {
         this.recorded = attendanceJson.recorded
         this.submittedBy = new Member(attendanceJson.submitted_by)
     }
-
-    /** @type {string} */
-    static id
-    /** @type {string} */
-    static name
-    /** @type {Date} */
-    static dateCreated
-    /** @type {Member[]} */
-    static members
-    /** @type {Member[]} */
-    static membersWithIssues
-    /** @type {bool} */
-    static recorded
-    /** @type {Member} */
-    static submittedBy
 
     get numberOfMembers() {
         return this.members.length

@@ -16,7 +16,28 @@ export const useMembersStore = defineStore("members", {
                         return
                     }
 
-                    resolve(commandResponse.result.map((m) => new Member(m)))
+                    resolve(commandResponse.result.members.map((m) => {
+                        m.eventsAttended = commandResponse.result.event_counts[m.id]
+                        return new Member(m)
+                    }).sort((a, b) => {
+                        if (a.rank.id < b.rank.id) {
+                            if (a.rank.id == 0) {
+                                return 1
+                            }
+
+                            return -1
+                        }
+
+                        if (a.rank.id > b.rank.id) {
+                            if (b.rank.id == 0) {
+                                return -1
+                            }
+
+                            return 1
+                        }
+
+                        return 0
+                    }))
                 }).catch((error) => {
                     console.log(error)
                 })

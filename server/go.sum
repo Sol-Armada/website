@@ -175,12 +175,8 @@ github.com/smartystreets/go-aws-auth v0.0.0-20180515143844-0c1422d1fdb9/go.mod h
 github.com/smartystreets/gunit v1.0.0/go.mod h1:qwPWnhz6pn0NnRBP++URONOVyNkPyr4SauJk4cUOwJs=
 github.com/sol-armada/admin v0.1.4 h1:qTe3iz9Anep+7p029ss8UgAWSR4k0eVIqQZ2MDoAl10=
 github.com/sol-armada/admin v0.1.4/go.mod h1:cXH6v0DW4DIhC3rm41wgHpuFRoZcogWmscf+v4iUNZM=
-github.com/sol-armada/sol-bot v1.5.0 h1:yHnbos2bu9CF0GXP9omH052QZlsU0KU+aJCnonhzzj8=
-github.com/sol-armada/sol-bot v1.5.0/go.mod h1:Jry1aFaHwv/0NX/w8K/6AHtWUSCUU+5DxIABs1tUVvA=
-github.com/sol-armada/sol-bot v1.5.1 h1:bo3rDKsrEkbk/dE/BhoPL5bhfT7W7J35V5EjAKKgujk=
-github.com/sol-armada/sol-bot v1.5.1/go.mod h1:Jry1aFaHwv/0NX/w8K/6AHtWUSCUU+5DxIABs1tUVvA=
-github.com/sol-armada/sol-bot v1.5.3 h1:ST1HiwZbsyT7DgftFCoYvotZvc9nMa9bIfII+7PcMr4=
-github.com/sol-armada/sol-bot v1.5.3/go.mod h1:Jry1aFaHwv/0NX/w8K/6AHtWUSCUU+5DxIABs1tUVvA=
+github.com/sol-armada/sol-bot v1.5.9 h1:hpfqT5pW+jJGLu6PPlInmR/NNRDhbJemYLe6o1i+Zmg=
+github.com/sol-armada/sol-bot v1.5.9/go.mod h1:aP+li2lVyYSdtBbCaAoigc1TGCP1faBo5h9CYwjDOoA=
 github.com/sourcegraph/conc v0.3.0 h1:OQTbbt6P72L20UqAkXXuLOj79LfEanQ+YQFNpLA9ySo=
 github.com/sourcegraph/conc v0.3.0/go.mod h1:Sdozi7LEKbFPqYX2/J+iBAM6HpqSLTASQIKqDmF7Mt0=
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=

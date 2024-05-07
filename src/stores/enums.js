@@ -1,4 +1,4 @@
-export const Ranks = {
+const Ranks = {
     0: {
         id: 0,
         name: "None",
@@ -52,5 +52,51 @@ export const Ranks = {
         name: "Guest",
         short: "",
         color: "guest",
+    },
+    99: {
+        id: 99,
+        name: "Ally",
+        short: "",
+        color: "ally",
+    },
+    100: {
+        id: 100,
+        name: "Pirate",
+        short: "",
+        color: "pirate",
     }
 }
+
+/*
+    BountyHunting  GameplayTypes = "bounty_hunting"
+    Engineering    GameplayTypes = "engineering"
+    Exporation     GameplayTypes = "exporation"
+    FpsCombat      GameplayTypes = "fps_combat"
+    Hauling        GameplayTypes = "hauling"
+    Medical        GameplayTypes = "medical"
+    Mining         GameplayTypes = "mining"
+    Reconnaissance GameplayTypes = "reconnaissance"
+    Racing         GameplayTypes = "racing"
+    Scrapping      GameplayTypes = "scrapping"
+    ShipCrew       GameplayTypes = "ship_crew"
+    ShipCombat     GameplayTypes = "ship_combat"
+    Trading        GameplayTypes = "trading"
+*/
+
+const Gameplay = {
+    "bounty_hunting": { title: "Bounty Hunting", value: "bounty_hunting" },
+    "engineering": { title: "Engineering", value: "engineering" },
+    "exporation": { title: "Exporation", value: "exporation" },
+    "fps_combat": { title: "FPS Combat", value: "fps_combat" },
+    "hauling": { title: "Hauling", value: "hauling" },
+    "medical": { title: "Medical", value: "medical" },
+    "mining": { title: "Mining", value: "mining" },
+    "reconnaissance": { title: "Reconnaissance", value: "reconnaissance" },
+    "racing": { title: "Racing", value: "racing" },
+    "scrapping": { title: "Scrapping", value: "scrapping" },
+    "ship_crew": { title: "Ship Crew", value: "ship_crew" },
+    "ship_combat": { title: "Ship Combat", value: "ship_combat" },
+    "trading": { title: "Trading", value: "trading" },
+}
+
+export { Ranks, Gameplay }

@@ -29,43 +29,71 @@
 
                                 <v-row class="justify-center">
                                     <v-col md="12">
-                                        <v-combobox label="How did you find us?"
-                                            :items="[{ title: 'RSI Website/Spectrum', value: 'rsi_website' }, { title: 'Recruited by a member', value: 'recruited' }, { title: 'Other', value: 'other' }]"
-                                            v-model="foundBy"></v-combobox>
+                                        <v-select label="How did you find us?" required v-model="foundBy"
+                                            :items="[{ title: 'RSI Website/Spectrum', value: 'rsi_website' }, { title: 'Recruited by a member', value: 'recruited' }, { title: 'Other', value: 'other' }]"></v-select>
                                     </v-col>
                                 </v-row>
 
-                                <v-row v-if="foundBy && foundBy.value == 'recruited'" class="justify-center">
+                                <v-row v-if="foundBy && foundBy == 'recruited' && !me.onboarded" class="justify-center">
                                     <v-col cols="12">
-                                        <v-combobox label="Who recruited you?"
-                                            :items="[{ title: 'Person A', value: '1234556' }]"></v-combobox>
+                                        <v-combobox label="Who recruited you?" :items="members" v-model="recruitedBy"
+                                            :required="foundBy && foundBy.value == 'recruited'"
+                                            :error="recruitedBy && recruitedBy.title == rsiHandle || !recruitedBy || !members.includes(recruitedBy)"
+                                            :error-messages="recruitedBy && recruitedBy.title == rsiHandle ? 'You can\'t recruit yourself' : null"></v-combobox>
                                     </v-col>
                                 </v-row>
-
-                                <v-row v-if="foundBy && foundBy.value == 'other'" class="justify-center">
+                                <v-row v-else-if="foundBy && foundBy == 'recruited' && me.recruitedBy && me.onboarded"
+                                    class="justify-center">
                                     <v-col cols="12">
-                                        <v-textarea label="How did you find us?"></v-textarea>
+                                        <v-combobox v-model="me.recruitedBy.name" disabled></v-combobox>
                                     </v-col>
                                 </v-row>
 
-                                <v-row class="justify-center">
+                                <v-row v-if="foundBy && foundBy == 'other'" class=" justify-center">
+                                    <v-col cols="12">
+                                        <v-textarea label="What is your story?" v-model="me.other"></v-textarea>
+                                    </v-col>
+                                </v-row>
+
+                                <v-row class="justify-center" v-if="!isMobile()">
                                     <v-col cols="12" md="6">
                                         <h5>Years playing Star Citizen (Round up)</h5>
                                         <v-number-input :reverse="false" controlVariant="split" label=""
-                                            :hideInput="false" :inset="false" v-model="yearsPlaying" min=0
+                                            :hideInput="false" :inset="false" v-model="me.playTime" min=0
                                             max=10></v-number-input>
                                     </v-col>
                                     <v-col cols="12" md="6">
                                         <h5>How old are you?</h5>
                                         <v-number-input :reverse="false" controlVariant="split" label=""
-                                            :hideInput="false" :inset="false" v-model="age" min=16
-                                            max=99></v-number-input>
+                                            :hideInput="false" :inset="false" v-model="me.age"></v-number-input>
+                                    </v-col>
+                                </v-row>
+
+                                <v-row class="justify-center text-left" v-else>
+                                    <v-col cols="12" md="6">
+                                        <h5>Years playing Star Citizen (Round up)</h5>
+                                        <v-slider v-model="me.playTime" step=1 :min=0 :max=10>
+                                            <template v-slot:append>
+                                                <v-text-field v-model="me.playTime" density="compact"
+                                                    style="width: 70px" type="number" hide-details
+                                                    single-line></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                    </v-col>
+                                    <v-col cols="12" md="6">
+                                        <h5>How old are you?</h5>
+                                        <v-slider v-model="me.age" step=1 :max=99>
+                                            <template v-slot:append>
+                                                <v-text-field v-model="me.age" density="compact" style="width: 70px"
+                                                    type="number" hide-details single-line></v-text-field>
+                                            </template>
+                                        </v-slider>
                                     </v-col>
                                 </v-row>
 
                                 <v-row class="justify-center">
                                     <v-col cols="12">
-                                        <v-select chips multiple hide-selected v-model="chosenGameplay"
+                                        <v-select chips multiple clearable v-model="chosenGameplay"
                                             label="What gameplay are you interested in?"
                                             :items="gameplayList"></v-select>
                                     </v-col>
@@ -73,8 +101,15 @@
 
                                 <v-row class="justify-center">
                                     <v-col cols="12">
+                                        <v-combobox required v-model="timeZone" label="What timezone are you in?"
+                                            :items="timeZones"></v-combobox>
+                                    </v-col>
+                                </v-row>
+
+                                <v-row class="justify-center">
+                                    <v-col cols="12">
                                         <v-btn color="primary" type="submit" @click="(e) => submit(e)"
-                                            :disabled="!rsiHandleValid || checkingRSIHandle">Submit</v-btn>
+                                            :disabled="!rsiHandleValid || checkingRSIHandle || timeZone == null">Submit</v-btn>
                                     </v-col>
                                 </v-row>
                             </v-form>
@@ -88,37 +123,62 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useTheme } from 'vuetify'
+import moment from 'moment-timezone'
+import { useMembersStore } from '@/stores/members'
+import { storeToRefs } from 'pinia'
+import { Gameplay } from '@/stores/enums'
 
 const appStore = useAppStore()
 
 const theme = useTheme()
 const logoColor = ref("blue")
 
+const { me } = storeToRefs(appStore)
+
 const foundBy = ref(null)
+const recruitedBy = ref(null)
 const rsiHandle = ref(null)
 const checkingRSIHandle = ref(false)
 const rsiHandleValid = ref(null)
-const yearsPlaying = ref(0)
-const age = ref(16)
-const gameplayList = [
-    { title: "Mining", value: "mining" },
-    { title: "Salvage", value: "salvage" },
-    { title: "Shipping", value: "shipping" },
-    { title: "Bounty Hunting", value: "bounty hunting" },
-    { title: "Racing", value: "racing" },
-    { title: "FPS Combat", value: "fps combat" },
-    { title: "Ship Combat", value: "ship combat" },
-    { title: "Engineering", value: "engineering" },
-    { title: "Medical", value: "medical" },
-    { title: "Exploration", value: "exploration" },
-]
+const members = ref([])
+const timeZones = moment.tz.names()
+const timeZone = ref(me.value.timeZone)
+const gameplayList = computed(() => {
+    return Object.keys(Gameplay).map((key) => {
+        return Gameplay[key]
+    })
+})
 const chosenGameplay = ref([])
 
 watch(chosenGameplay, () => {
-    console.log(chosenGameplay.value)
+    me.value.gameplay = chosenGameplay.value
+})
+
+watch(timeZone, () => {
+    me.value.timeZone = timeZone.value
+})
+
+watch(foundBy, () => {
+    me.value.foundBy = foundBy.value
+    if (foundBy.value && foundBy.value == "recruited" && members.value.length == 0) {
+        useMembersStore().getMembers().then((res) => {
+            for (let i = 0; i < res.length; i++) {
+                members.value.push({
+                    title: res[i].name,
+                    value: res[i].id
+                })
+            }
+        })
+    }
+})
+
+watch(recruitedBy, () => {
+    if (recruitedBy.value) {
+        me.value.recruitedBy = recruitedBy.value.value
+    }
 })
 
 // debounce rsi handle input
@@ -137,15 +197,6 @@ function debounce() {
 function submit(event) {
     event.preventDefault()
 
-    appStore.me.age = age.value
-    appStore.me.name = rsiHandle.value
-    appStore.me.playtime = yearsPlaying.value
-    const gamePlay = []
-    for (let i = 0; i < chosenGameplay.value.length; i++) {
-        gamePlay.push(chosenGameplay.value[i])
-    }
-    appStore.me.gameplay = gamePlay
-
     appStore.updateSelf().then((res) => {
         if (res) {
             localStorage.setItem('onboarded', true)
@@ -159,10 +210,27 @@ onMounted(() => {
     if (theme.name.value == "dark") {
         logoColor.value = "white"
     }
+
+    rsiHandle.value = me.value.name
+    debounce()
+
+    if (me.value.gameplay) {
+        for (let i = 0; i < me.value.gameplay.length; i++) {
+            chosenGameplay.value.push(Gameplay[me.value.gameplay[i]])
+        }
+    }
+
+    if (me.value.foundBy) {
+        foundBy.value = me.value.foundBy
+    }
 })
+
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
 
 </script>
 <route lang="yaml">
 meta:
-  layout: plain
+    layout: plain
 </route>

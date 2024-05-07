@@ -1,5 +1,6 @@
 // Utilities
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { useConnectionStore } from './connection'
 import { useErrorStore } from './error'
 import { Member } from './classes'
@@ -21,6 +22,11 @@ export const useAppStore = defineStore('app', () => {
         token.value = localStorage.getItem('token')
         onboarded.value = localStorage.getItem('onboarded')
         version.value = localStorage.getItem('version')
+
+        if (me.value && me.value.onboarded) {
+            onboarded.value = me.value.onboarded
+            localStorage.setItem('onboarded', onboarded.value)
+        }
 
         connectionStore.addListener('version', 'check').then((commandResponse) => {
             // handle errors
@@ -65,7 +71,7 @@ export const useAppStore = defineStore('app', () => {
                 token.value = commandResponse.result
                 loggedIn.value = true
 
-                if (me.value && me.value.onboarded_at) {
+                if (me.value && me.value.onboardedAt) {
                     onboarded.value = true
                 }
 
@@ -100,11 +106,13 @@ export const useAppStore = defineStore('app', () => {
                     }
                 }
 
+                console.log(JSON.stringify(commandResponse.result))
+
                 me.value = new Member(commandResponse.result)
 
-                if (me.value && me.value.onboarded_at) {
-                    onboarded.value = true
-                }
+                // if (me.value && me.value.onboardedAt) {
+                //     onboarded.value = true
+                // }
 
                 save()
                 resolve(true)
@@ -135,7 +143,7 @@ export const useAppStore = defineStore('app', () => {
     }
 
     async function updateSelf() {
-        me.value.onboarded_at = new Date()
+        me.value.onboardedAt = new Date()
 
         return new Promise((resolve) => {
             connectionStore.addListener('members', 'update-me').then((commandResponse) => {
@@ -144,6 +152,8 @@ export const useAppStore = defineStore('app', () => {
                     errorStore.$patch({ error: commandResponse.error, show: true })
                     return
                 }
+
+                save()
 
                 resolve(true)
             }).catch((error) => {
@@ -173,10 +183,7 @@ export const useAppStore = defineStore('app', () => {
         localStorage.setItem("token", token.value)
         localStorage.setItem("me", JSON.stringify(me.value))
         localStorage.setItem("logged_in", loggedIn.value)
-
-        if (me.value && me.value.onboarded_at) {
-            localStorage.setItem('onboarded', true)
-        }
+        localStorage.setItem('onboarded', me.value ? me.value.onboarded : false)
     }
 
     return {

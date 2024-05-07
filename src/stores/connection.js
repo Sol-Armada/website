@@ -1,4 +1,5 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
+import { ref } from 'vue'
 import { CommandResponse } from "./classes"
 import { useErrorStore } from "./error"
 import { useAppStore } from "./app"
