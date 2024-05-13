@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-app-bar v-if="$vuetify.display.mobile">
         <template v-slot:prepend>
@@ -27,11 +28,15 @@
                 </v-sheet>
             </v-list-item>
             <v-divider></v-divider>
-            <v-list-item link title="Home" to="/"></v-list-item>
+            <v-list-item link title="Dashboard" to="/"></v-list-item>
+            <v-list-item link title="Contracts" to="/contracts"></v-list-item>
             <div v-if="me && me.rank.id <= 3">
+                <v-divider></v-divider>
+                <v-list-item class="text-center" title="Administration"></v-list-item>
                 <v-divider></v-divider>
                 <v-list-item link title="Members" to="/members"></v-list-item>
                 <v-list-item link title="Attendance Records" to="/attendance"></v-list-item>
+                <v-list-item link title="Contract Manager" to="/contract-manager"></v-list-item>
             </div>
         </v-list>
         <template v-slot:append>

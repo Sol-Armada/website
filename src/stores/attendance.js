@@ -30,6 +30,28 @@ export const useAttendanceStore = defineStore("attendance", {
                     connectionStore.send('attendance', 'list', page)
                 }, 500)
             })
+        },
+
+        async getAttendanceCount() {
+            return new Promise((resolve) => {
+                const errorStore = useErrorStore()
+                const connectionStore = useConnectionStore()
+                connectionStore.addListener('attendance', 'count').then((commandResponse) => {
+                    // handle errors
+                    if (commandResponse.error) {
+                        errorStore.$patch({ error: commandResponse.error, show: true })
+                        return
+                    }
+
+                    resolve(commandResponse.result)
+                }).catch((error) => {
+                    console.log(error)
+                })
+
+                setTimeout(() => {
+                    connectionStore.send('attendance', 'count', '')
+                }, 500)
+            })
         }
     }
 })

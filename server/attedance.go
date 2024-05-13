@@ -15,10 +15,11 @@ import (
 )
 
 var attendanceActions = map[string]Action{
-	"list": listAttendance,
+	"list":  listAttendance,
+	"count": getAttendanceCount,
 }
 
-func listAttendance(ctx context.Context, c *Client, arg any) CommandResponse {
+func listAttendance(ctx context.Context, _ *Client, arg any) CommandResponse {
 	logger := slog.Default()
 
 	member := ctx.Value(contextKeyMember).(*members.Member)
@@ -29,8 +30,7 @@ func listAttendance(ctx context.Context, c *Client, arg any) CommandResponse {
 	}
 
 	if arg == "undefined" {
-		cr.Result = []*users.User{}
-		return cr
+		arg = "0"
 	}
 
 	if member.Rank > ranks.Lieutenant {
@@ -63,5 +63,26 @@ func listAttendance(ctx context.Context, c *Client, arg any) CommandResponse {
 
 	cr.Result = attendanceRecords
 
+	return cr
+}
+
+func getAttendanceCount(ctx context.Context, _ *Client, _ any) CommandResponse {
+	logger := slog.Default()
+
+	member := ctx.Value(contextKeyMember).(*members.Member)
+
+	cr := CommandResponse{
+		Thing:  "attendance",
+		Action: "count",
+	}
+
+	count, err := attndnc.GetMemberAttendanceCount(member.Id)
+	if err != nil {
+		logger.Error("failed to get attendance count", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	cr.Result = count
 	return cr
 }

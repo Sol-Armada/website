@@ -23,6 +23,10 @@ export const useAppStore = defineStore('app', () => {
         onboarded.value = localStorage.getItem('onboarded')
         version.value = localStorage.getItem('version')
 
+        if (me.value) {
+            me.value = new Member(me.value)
+        }
+
         if (me.value && me.value.onboarded) {
             onboarded.value = me.value.onboarded
             localStorage.setItem('onboarded', onboarded.value)

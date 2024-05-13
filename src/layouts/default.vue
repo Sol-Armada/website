@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-app>
-        <Navigation />
+        <Navigation v-if="me.isOfficer" />
 
         <v-main class="d-flex justify-center" style="min-height: 300px;">
             <router-view />
@@ -9,6 +9,14 @@
     </v-app>
 </template>
 
-<script setup></script>
+<script setup>
+import { useAppStore } from '@/stores/app'
+import { storeToRefs } from 'pinia'
+
+const appStore = useAppStore()
+
+const { me } = storeToRefs(appStore)
+
+</script>
 
 <style lang="scss"></style>

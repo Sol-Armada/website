@@ -16,7 +16,11 @@ export const Member = class Member {
     constructor(memberJson) {
         this.id = memberJson.id
         this.name = memberJson.name
-        this.rank = Ranks[memberJson.rank]
+        if (typeof memberJson.rank == 'object') {
+            this.rank = Ranks[memberJson.rank.id]
+        } else {
+            this.rank = Ranks[memberJson.rank]
+        }
         this.eventsAttended = memberJson.eventsAttended
         this.validated = memberJson.validated
         this.avatar = memberJson.avatar
@@ -43,7 +47,7 @@ export const Member = class Member {
     }
 
     get isOfficer() {
-        return this.rank.id <= 3
+        return this.rank.id <= 3 && this.rank.id != 0
     }
 
     get isMember() {
