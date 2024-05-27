@@ -21,7 +21,7 @@ pnpm-debug.log*
 *.sw?
 
 bin/
-deploy.sh
+deploy*.sh
 
 **/__debug_bin*
 **/config.*

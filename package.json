@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build-beta": "vite build --mode beta",
     "preview": "vite preview",
     "lint": "eslint . --fix --ignore-path .gitignore",
     "dev-debug": "node --inspect-brk=5959entry.js"
@@ -14,6 +15,7 @@
     "moment-timezone": "^0.5.45",
     "roboto-fontface": "*",
     "vue": "^3.4.0",
+    "vue-matomo": "^4.2.0",
     "vuetify": "^3.5.0"
   },
   "devDependencies": {

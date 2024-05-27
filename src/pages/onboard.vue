@@ -20,7 +20,7 @@
                                     <v-col md="12">
                                         <v-text-field name="rsi_handle" label="RSI Handle" v-model="rsiHandle"
                                             @input="debounce()"
-                                            :hint="'https://robersspaceindustries.com/citizens/' + rsiHandle"
+                                            :hint="'https://robertsspaceindustries.com/citizens/' + rsiHandle"
                                             persistent-hint clearable :loading="checkingRSIHandle"
                                             :validation-value="rsiHandleValid"
                                             :rules="[(v) => !!v || 'RSI Handle is required and needs to be valid']"></v-text-field>
