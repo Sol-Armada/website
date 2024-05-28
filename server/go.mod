@@ -10,7 +10,7 @@ require (
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/samber/slog-echo v1.12.5
 	github.com/sol-armada/admin v0.1.4
-	github.com/sol-armada/sol-bot v1.6.1
+	github.com/sol-armada/sol-bot v1.6.2
 	github.com/spf13/viper v1.18.2
 	go.mongodb.org/mongo-driver v1.15.0
 )
