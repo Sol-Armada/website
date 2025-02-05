@@ -26,7 +26,7 @@ const items = [
   {
     title: 'Sol Armada Discord',
     icon: `fa fa-brands fa-discord`,
-    href: 'https://community.vuetifyjs.com/',
+    href: 'https://discord.solarmada.space/',
   },
   {
     title: 'Sol Armada YouTube',

@@ -30,6 +30,7 @@ const rankColors = {
 
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
+  ssr: true,
   components: {
     VNumberInput,
   },

@@ -100,3 +100,26 @@ export const Attendance = class Attendance {
         return utcDate.toLocaleString(undefined, options)
     }
 }
+
+export const Token = class Token {
+    constructor(tokenJson) {
+        this.id = tokenJson.id
+        this.memberId = tokenJson.member_id
+        this.reason = tokenJson.reason
+        this.comment = tokenJson.comment
+        this.amount = tokenJson.amount
+        this.attendanceId = tokenJson.attendance_id
+
+        this.createdAt = new Date(tokenJson.created_at)
+    }
+
+    get createdDate() {
+        const utcDate = new Date(this.createdAt)
+        const options = {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }
+        return utcDate.toLocaleString(undefined, options)
+    }
+}

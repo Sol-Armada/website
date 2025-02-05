@@ -8,13 +8,27 @@
             "type": "shell",
             "command": "yarn dev",
             "isBackground": true,
-            "problemMatcher": []
+            "dependsOn": [
+                "db - up"
+            ]
         },
         {
             "label": "Terminate All Tasks",
             "command": "echo ${input:terminate}",
             "type": "shell",
-            "problemMatcher": []
+            "dependsOn": [
+                "db - down"
+            ]
+        },
+        {
+            "label": "db - up",
+            "type": "shell",
+            "command": "docker run -d --rm -v db:/data/db -p 27017:27017 mongo:latest",
+        },
+        {
+            "label": "db - down",
+            "type": "shell",
+            "command": "docker stop $(docker ps -q --filter ancestor=mongo:latest)",
         }
     ],
     "inputs": [

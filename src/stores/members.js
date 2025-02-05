@@ -4,6 +4,9 @@ import { Member } from "./classes"
 import { useErrorStore } from "./error"
 
 export const useMembersStore = defineStore("members", {
+    state: () => ({
+        members: new Map()
+    }),
     actions: {
         async getMembers(page) {
             return new Promise((resolve) => {
@@ -47,5 +50,15 @@ export const useMembersStore = defineStore("members", {
                 }, 500)
             })
         }
+    },
+    persist: {
+        enabled: true,
+        strategies: [
+            {
+                name: localStorage,
+                key: "members",
+                paths: ["members"]
+            }
+        ]
     }
 })

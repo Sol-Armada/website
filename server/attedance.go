@@ -15,8 +15,9 @@ import (
 )
 
 var attendanceActions = map[string]Action{
-	"list":  listAttendance,
-	"count": getAttendanceCount,
+	"list":    listAttendance,
+	"count":   getAttendanceCount,
+	"records": getMemberAttendanceRecords,
 }
 
 func listAttendance(ctx context.Context, _ *Client, arg any) CommandResponse {
@@ -66,17 +67,17 @@ func listAttendance(ctx context.Context, _ *Client, arg any) CommandResponse {
 	return cr
 }
 
-func getAttendanceCount(ctx context.Context, _ *Client, _ any) CommandResponse {
+func getAttendanceCount(_ context.Context, _ *Client, id any) CommandResponse {
 	logger := slog.Default()
 
-	member := ctx.Value(contextKeyMember).(*members.Member)
+	memberId := id.(string)
 
 	cr := CommandResponse{
 		Thing:  "attendance",
 		Action: "count",
 	}
 
-	count, err := attndnc.GetMemberAttendanceCount(member.Id)
+	count, err := attndnc.GetMemberAttendanceCount(memberId)
 	if err != nil {
 		logger.Error("failed to get attendance count", "error", err)
 		cr.Error = "internal_error"
@@ -84,5 +85,26 @@ func getAttendanceCount(ctx context.Context, _ *Client, _ any) CommandResponse {
 	}
 
 	cr.Result = count
+	return cr
+}
+
+func getMemberAttendanceRecords(_ context.Context, _ *Client, id any) CommandResponse {
+	logger := slog.Default()
+
+	memberId := id.(string)
+
+	cr := CommandResponse{
+		Thing:  "attendance",
+		Action: "records",
+	}
+
+	records, err := attndnc.GetMemberAttendanceRecords(memberId)
+	if err != nil {
+		logger.Error("failed to get attendance records", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	cr.Result = records
 	return cr
 }

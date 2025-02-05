@@ -6,11 +6,11 @@ toolchain go1.22.2
 
 require (
 	github.com/charmbracelet/log v0.4.0
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/samber/slog-echo v1.12.5
 	github.com/sol-armada/admin v0.1.4
-	github.com/sol-armada/sol-bot v1.6.2
+	github.com/sol-armada/sol-bot v1.9.3
 	github.com/spf13/viper v1.18.2
 	go.mongodb.org/mongo-driver v1.15.0
 )
@@ -78,15 +78,15 @@ require (
 	go.opentelemetry.io/otel/trace v1.19.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/net v0.24.0 // indirect
-	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// replace github.com/sol-armada/sol-bot v1.5.11 => ../../sol-bot
+replace github.com/sol-armada/sol-bot v1.9.1 => ../../sol-bot

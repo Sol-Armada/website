@@ -124,6 +124,8 @@ func (h *Hub) run() {
 				res = contractsActions[command.Action](ctx, command.Client, command.Arg)
 			case "attendance":
 				res = attendanceActions[command.Action](ctx, command.Client, command.Arg)
+			case "tokens":
+				res = tokensActions[command.Action](ctx, command.Client, command.Arg)
 			case "version":
 				if command.Action == "check" {
 					res = CommandResponse{Thing: command.Thing, Action: command.Action, Result: version}

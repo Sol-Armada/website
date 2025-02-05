@@ -16,6 +16,7 @@
                             <div class="py-2" />
 
                             <v-btn prepend-icon="fa:fas fa-brands fa-discord" size="large" color="discord-primary"
+                                :disabled="appStore.loggingIn || !connectionStore.isConnected"
                                 v-if="!appStore.loggingIn && code === null" :href="discordAuthUrl">Login with
                                 Discord</v-btn>
 
@@ -32,9 +33,11 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
+import { useConnectionStore } from '@/stores/connection'
 import { useTheme } from 'vuetify'
 
 const appStore = useAppStore()
+const connectionStore = useConnectionStore()
 
 const discordAuthUrl = ref(import.meta.env.VITE_DISCORD_AUTH_URL)
 const theme = useTheme()

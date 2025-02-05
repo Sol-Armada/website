@@ -23,6 +23,11 @@
                                 {{ eventCount }}
                             </div>
                         </v-col>
+                        <v-col cols="12" v-if="!me.isOfficer">
+                            <div class="text-center">
+                                <v-btn color="primary" @click="appStore.logout()">Logout</v-btn>
+                            </div>
+                        </v-col>
                     </v-row>
                 </v-card>
             </v-col>
@@ -51,7 +56,7 @@ if (theme.current.value.dark) {
 const eventCount = ref(null)
 
 onMounted(() => {
-    attendanceStore.getAttendanceCount().then((res) => {
+    attendanceStore.getAttendanceCount(me.value.id).then((res) => {
         eventCount.value = res
     })
 })

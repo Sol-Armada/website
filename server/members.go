@@ -201,7 +201,7 @@ func updateMe(ctx context.Context, c *Client, arg any) CommandResponse {
 			return cr
 		}
 
-		me.Recruiter = recruiter
+		me.Recruiter = &recruiter.Id
 	}
 
 	onboardedAtRaw := updatesMap["onboardedAt"].(string)

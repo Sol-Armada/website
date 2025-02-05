@@ -19,6 +19,7 @@ import (
 	attndnc "github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/stores"
+	tkns "github.com/sol-armada/sol-bot/tokens"
 	"github.com/spf13/viper"
 )
 
@@ -96,6 +97,11 @@ func main() {
 
 	if err := attndnc.Setup(); err != nil {
 		slog.Error("failed to setup attendance", "error", err)
+		return
+	}
+
+	if err := tkns.Setup(); err != nil {
+		slog.Error("failed to setup tokens", "error", err)
 		return
 	}
 

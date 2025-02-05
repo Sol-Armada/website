@@ -32,7 +32,7 @@ export const useAttendanceStore = defineStore("attendance", {
             })
         },
 
-        async getAttendanceCount() {
+        async getAttendanceCount(id) {
             return new Promise((resolve) => {
                 const errorStore = useErrorStore()
                 const connectionStore = useConnectionStore()
@@ -49,7 +49,34 @@ export const useAttendanceStore = defineStore("attendance", {
                 })
 
                 setTimeout(() => {
-                    connectionStore.send('attendance', 'count', '')
+                    connectionStore.send('attendance', 'count', id)
+                }, 500)
+            })
+        },
+
+        async getMemberAttendanceRecords(id) {
+            return new Promise((resolve) => {
+                const errorStore = useErrorStore()
+                const connectionStore = useConnectionStore()
+                connectionStore.addListener('attendance', 'records').then((commandResponse) => {
+                    // handle errors
+                    if (commandResponse.error) {
+                        errorStore.$patch({ error: commandResponse.error, show: true })
+                        return
+                    }
+
+                    if (!commandResponse.result) {
+                        resolve([])
+                        return
+                    }
+
+                    resolve(commandResponse.result.map((a) => new Attendance(a)))
+                }).catch((error) => {
+                    console.log(error)
+                })
+
+                setTimeout(() => {
+                    connectionStore.send('attendance', 'records', id)
                 }, 500)
             })
         }

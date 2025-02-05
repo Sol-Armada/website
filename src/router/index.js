@@ -29,11 +29,6 @@ router.beforeEach((to, from, next) => {
         return
     }
 
-    // if (to.path === '/onboard' && localStorage.getItem('logged_in') && localStorage.getItem('onboarded')) {
-    //     next('/')
-    //     return
-    // }
-
     // check if they have permission to the page
     if (to.meta.requiresOfficer && appStore.me.rank.id > 3) {
         next('/')
@@ -42,23 +37,5 @@ router.beforeEach((to, from, next) => {
 
     next()
 })
-
-// router.afterEach((to, from) => {
-//     const appStore = useAppStore()
-//     const code = new URLSearchParams(window.location.search).get('code')
-
-//     if (to.path === '/login' && code) {
-//         appStore.login(code).then((res) => {
-//             if (res) {
-//                 window.location.href = "/"
-//             }
-//         }).catch((err) => {
-//             if (err === 'invalid_grant') {
-//                 // clear the code from the url
-//                 window.history.replaceState({}, document.title, "/login")
-//             }
-//         })
-//     }
-// })
 
 export default router
