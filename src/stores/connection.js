@@ -74,7 +74,16 @@ export const useConnectionStore = defineStore("connection", () => {
                 }
             })
         })
+    }
 
+    function addForeverListener(thing, action, callback) {
+        socket.value.addEventListener("message", (event) => {
+            const commandResponse = new CommandResponse(event.data)
+
+            if (commandResponse.thing === thing && commandResponse.action === action) {
+                callback(commandResponse)
+            }
+        })
     }
 
     return {
@@ -82,6 +91,7 @@ export const useConnectionStore = defineStore("connection", () => {
         connect,
         send,
         addListener,
+        addForeverListener,
         isConnected
     }
 })

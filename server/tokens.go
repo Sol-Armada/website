@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sol-armada/admin/users"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/ranks"
 	tkns "github.com/sol-armada/sol-bot/tokens"
@@ -14,6 +14,44 @@ import (
 
 var tokensActions = map[string]Action{
 	"list": listTokenRecords,
+}
+
+func watchForTokens(ctx context.Context, hub *Hub) {
+	logger := slog.Default()
+
+	tokenRecord := make(chan tkns.TokenRecord)
+
+	go func() {
+		if err := tkns.Watch(ctx, tokenRecord); err != nil {
+			logger.Error("failed to watch for token records", "error", err)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			close(tokenRecord)
+			return
+		case tr := <-tokenRecord:
+			logger.Debug("token record received", "record", tr)
+
+			// iterate over hub clients
+			for c, m := range hub.clients {
+				if m == nil || !m.IsOfficer() {
+					continue
+				}
+
+				res := CommandResponse{
+					Thing:  "tokens",
+					Action: "get",
+					Result: tr,
+				}
+				c.send <- res.ToJsonBytes()
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}
 }
 
 func listTokenRecords(ctx context.Context, c *Client, arg any) CommandResponse {
@@ -34,7 +72,7 @@ func listTokenRecords(ctx context.Context, c *Client, arg any) CommandResponse {
 	tokenRecords, err := tkns.GetAll()
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			cr.Result = []*users.User{}
+			cr.Result = []*members.Member{}
 			return cr
 		}
 

@@ -19,7 +19,7 @@
                                 v-model:page="page" v-touch="{
                                     left: () => swipe('Left'),
                                     right: () => swipe('Right')
-                                }">
+                                }" v-model:sort-by.sync="sortBy">
                                 <template v-slot:item="{ item }">
                                     <tr :id="item.id">
                                         <td>
@@ -39,7 +39,8 @@
                                         <td>
                                             <v-col cols="12">
                                                 <v-card>
-                                                    <v-card-text>{{ item.createdDate }}</v-card-text>
+                                                    <v-card-text>{{ new Date(item.createdDate).toLocaleString()
+                                                        }}</v-card-text>
                                                 </v-card>
                                             </v-col>
                                         </td>
@@ -72,8 +73,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useTheme } from 'vuetify'
 import { useAttendanceStore } from '@/stores/attendance'
+import { storeToRefs } from 'pinia'
 
 const attendanceStore = useAttendanceStore()
+const { attendance } = storeToRefs(attendanceStore)
 
 const loading = ref(true)
 const loadingText = ref('Loading attendance records... 0')
@@ -81,14 +84,15 @@ const loadingText = ref('Loading attendance records... 0')
 const headers = [
     { title: 'Name', key: 'name' },
     { title: 'Member Count', key: 'memberCount' },
-    { title: 'Created (UTC)', key: 'dateCreated' },
+    { title: 'Created Date', key: 'dateCreated' },
     { title: 'Submitted by', key: 'submittedBy' },
     { title: 'Recorded', key: 'recorded' },
 ]
-const attendanceRecords = ref([])
+const attendanceRecords = ref(attendance.value)
 const attendanceRecordsPage = ref(1)
 const page = ref(1)
 const search = ref('')
+const sortBy = ref([{ key: 'date_created', order: 'desc' }]);
 
 const theme = useTheme()
 const ld = ref('darken')
@@ -117,13 +121,12 @@ onMounted(async () => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
         loadingText.value = `Loading attendance records... (${attendanceRecords.value.length})`
-        const moreMembers = await attendanceStore.getAttendanceRecords(attendanceRecordsPage.value)
-        if (moreMembers.length == 0) {
-            console.log("no more attendance records")
+        const moreRecords = await attendanceStore.getAttendanceRecords(attendanceRecordsPage.value)
+        if (moreRecords.length == 0) {
+            console.debug("no more attendance records")
             loading.value = false
             break
         }
-        attendanceRecords.value.push(...moreMembers)
         attendanceRecordsPage.value += 1
     }
 })

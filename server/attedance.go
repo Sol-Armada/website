@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sol-armada/admin/users"
 	attndnc "github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/ranks"
@@ -18,6 +18,44 @@ var attendanceActions = map[string]Action{
 	"list":    listAttendance,
 	"count":   getAttendanceCount,
 	"records": getMemberAttendanceRecords,
+}
+
+func watchForAttendance(ctx context.Context, hub *Hub) {
+	logger := slog.Default()
+
+	attedanceRecord := make(chan attndnc.Attendance)
+
+	go func() {
+		if err := attndnc.Watch(ctx, attedanceRecord); err != nil {
+			logger.Error("failed to watch for attendance records", "error", err)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			close(attedanceRecord)
+			return
+		case tr := <-attedanceRecord:
+			logger.Debug("attendance record received", "record", tr)
+
+			// iterate over hub clients
+			for c, m := range hub.clients {
+				if m == nil || !m.IsOfficer() {
+					continue
+				}
+
+				res := CommandResponse{
+					Thing:  "attendance",
+					Action: "get",
+					Result: tr,
+				}
+				c.send <- res.ToJsonBytes()
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}
 }
 
 func listAttendance(ctx context.Context, _ *Client, arg any) CommandResponse {
@@ -53,7 +91,7 @@ func listAttendance(ctx context.Context, _ *Client, arg any) CommandResponse {
 	attendanceRecords, err := attndnc.List(bson.D{}, 100, page)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			cr.Result = []*users.User{}
+			cr.Result = []*members.Member{}
 			return cr
 		}
 

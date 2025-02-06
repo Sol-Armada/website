@@ -18,10 +18,43 @@ var membersActions = map[string]Action{
 	"list":      getMembers,
 	"me":        getMe,
 	"update-me": updateMe,
+	"get":       getMember,
 }
 
 type MembersCollection struct {
 	*mongo.Collection
+}
+
+func getMember(ctx context.Context, c *Client, id any) CommandResponse {
+	cr := CommandResponse{
+		Thing:  "members",
+		Action: "get",
+	}
+
+	uAccess, ok := ctx.Value(contextKeyAccess).(userAccess)
+	if !ok {
+		cr.Error = "unauthorized"
+		return cr
+	}
+
+	logger := slog.With("token", uAccess.Token, "id", id)
+	logger.Info("creating new user access")
+
+	member, err := solmembers.Get(id.(string))
+	if err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			logger.Error("failed to get user", "error", err)
+			cr.Error = "internal_error"
+			return cr
+		}
+
+		logger.Debug("member not found")
+		return cr
+	}
+
+	cr.Result = member
+
+	return cr
 }
 
 func getMe(ctx context.Context, c *Client, token any) CommandResponse {

@@ -8,6 +8,25 @@ export const useMembersStore = defineStore("members", {
         members: new Map()
     }),
     actions: {
+        getMember(id) {
+            if (this.members.has(id)) {
+                return this.members.get(id)
+            }
+
+            const connectionStore = useConnectionStore()
+            setTimeout(() => {
+                connectionStore.send('members', 'get', id)
+            }, 500)
+            // wait for this.members to have the member
+            return new Promise((resolve) => {
+                const interval = setInterval(() => {
+                    if (this.members.has(id)) {
+                        clearInterval(interval)
+                        resolve(this.members.get(id))
+                    }
+                }, 100)
+            })
+        },
         async getMembers(page) {
             return new Promise((resolve) => {
                 const errorStore = useErrorStore()

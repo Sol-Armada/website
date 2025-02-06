@@ -4,6 +4,9 @@ import { Attendance } from "./classes"
 import { useErrorStore } from "./error"
 
 export const useAttendanceStore = defineStore("attendance", {
+    state: () => ({
+        attendance: []
+    }),
     actions: {
         async getAttendanceRecords(page) {
             return new Promise((resolve) => {
@@ -20,6 +23,8 @@ export const useAttendanceStore = defineStore("attendance", {
                         resolve([])
                         return
                     }
+
+                    this.attendance.push(...commandResponse.result.map((a) => new Attendance(a)))
 
                     resolve(commandResponse.result.map((a) => new Attendance(a)))
                 }).catch((error) => {

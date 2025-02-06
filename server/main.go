@@ -84,8 +84,11 @@ func main() {
 
 	host := viper.GetString("MONGO.HOST")
 	port := viper.GetInt("MONGO.PORT")
+	replicaSetName := viper.GetString("MONGO.REPLICA_SET_NAME")
 	database := viper.GetString("MONGO.DATABASE")
-	if _, err := stores.New(ctx, host, port, "", "", database); err != nil {
+
+	_, err := stores.New(ctx, host, port, "", "", database, replicaSetName)
+	if err != nil {
 		slog.Error("failed to connect to mongo", "error", err)
 		return
 	}
@@ -109,6 +112,9 @@ func main() {
 
 	hub := newHub(ctx)
 	go hub.run()
+
+	go watchForTokens(ctx, hub)
+	go watchForAttendance(ctx, hub)
 
 	e := echo.New()
 	e.HideBanner = true

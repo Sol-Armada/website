@@ -33,7 +33,7 @@ type Action func(ctx context.Context, c *Client, arg any) CommandResponse
 
 type Hub struct {
 	// registered clients
-	clients map[*Client]bool
+	clients map[*Client]*members.Member
 
 	// inbound commands from the clients
 	broadcast chan *CommandRequest
@@ -59,7 +59,7 @@ func newHub(ctx context.Context) *Hub {
 		broadcast:  make(chan *CommandRequest),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
-		clients:    make(map[*Client]bool),
+		clients:    make(map[*Client]*members.Member),
 		ctx:        ctx,
 	}
 }
@@ -69,7 +69,7 @@ func (h *Hub) run() {
 		select {
 		case client := <-h.register:
 			slog.Default().Info("registering client")
-			h.clients[client] = true
+			h.clients[client] = nil
 		case client := <-h.unregister:
 			slog.Default().Info("unregistering client")
 			if _, ok := h.clients[client]; ok {
@@ -107,6 +107,8 @@ func (h *Hub) run() {
 					command.Client.send <- r.ToJsonBytes()
 					continue
 				}
+
+				h.clients[command.Client] = member
 
 				ctx = context.WithValue(ctx, contextKeyMember, member)
 			}

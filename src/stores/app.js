@@ -3,11 +3,17 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useConnectionStore } from './connection'
 import { useErrorStore } from './error'
-import { Member } from './classes'
+import { Attendance, Member, Token } from './classes'
+import { useMembersStore } from './members'
+import { useAttendanceStore } from './attendance'
+import { useTokensStore } from './tokens'
 
 export const useAppStore = defineStore('app', () => {
     const errorStore = useErrorStore()
     const connectionStore = useConnectionStore()
+    const membersStore = useMembersStore()
+    const attendanceStore = useAttendanceStore()
+    const tokensStore = useTokensStore()
 
     const loggedIn = ref(false)
     const token = ref(null)
@@ -32,7 +38,24 @@ export const useAppStore = defineStore('app', () => {
             localStorage.setItem('onboarded', onboarded.value)
         }
 
-        connectionStore.addListener('version', 'check').then((commandResponse) => {
+        // connectionStore.addListener('version', 'check').then((commandResponse) => {
+        //     // handle errors
+        //     if (commandResponse.error) {
+        //         errorStore.$patch({ error: commandResponse.error, show: true })
+        //         return
+        //     }
+        //     if (version.value && commandResponse.result != version.value) {
+        //         logout()
+        //     }
+
+        //     localStorage.setItem('version', commandResponse.result)
+        // }).catch((error) => {
+        //     if (error == 'invalid_access') {
+        //         logout()
+        //     }
+        // })
+
+        connectionStore.addForeverListener('version', 'check', (commandResponse) => {
             // handle errors
             if (commandResponse.error) {
                 errorStore.$patch({ error: commandResponse.error, show: true })
@@ -43,9 +66,59 @@ export const useAppStore = defineStore('app', () => {
             }
 
             localStorage.setItem('version', commandResponse.result)
-        }).catch((error) => {
-            if (error == 'invalid_access') {
-                logout()
+        })
+
+        connectionStore.addForeverListener('members', 'get', (commandResponse) => {
+            // handle errors
+            if (commandResponse.error) {
+                errorStore.$patch({ error: commandResponse.error, show: true })
+                return
+            }
+
+            const member = new Member(commandResponse.result)
+            membersStore.members.set(member.id, member)
+        })
+
+        connectionStore.addForeverListener('attendance', 'get', (commandResponse) => {
+            // handle errors
+            if (commandResponse.error) {
+                errorStore.$patch({ error: commandResponse.error, show: true })
+                return
+            }
+
+            if (!commandResponse.result) {
+                return
+            }
+
+            const attendance = new Attendance(commandResponse.result)
+            attendanceStore.attendance.push(attendance)
+        })
+
+        connectionStore.addForeverListener('tokens', 'get', async (commandResponse) => {
+            // handle errors
+            if (commandResponse.error) {
+                errorStore.$patch({ error: commandResponse.error, show: true })
+                return
+            }
+
+            if (!commandResponse.result) {
+                return
+            }
+
+            const tokenRaw = commandResponse.result
+            try {
+                const member = await membersStore.getMember(tokenRaw.member_id)
+                tokenRaw.member = member.name
+
+                if (tokenRaw.giver_id != null) {
+                    const giver = await membersStore.getMember(tokenRaw.giver_id)
+                    tokenRaw.giver = giver.name
+                }
+
+                const token = new Token(tokenRaw)
+                tokensStore.tokens.push(token)
+            } catch (error) {
+                errorStore.$patch({ error: error.message, show: true })
             }
         })
 

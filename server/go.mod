@@ -9,8 +9,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/samber/slog-echo v1.12.5
-	github.com/sol-armada/admin v0.1.4
-	github.com/sol-armada/sol-bot v1.9.3
+	github.com/sol-armada/sol-bot v1.9.5
 	github.com/spf13/viper v1.18.2
 	go.mongodb.org/mongo-driver v1.15.0
 )
@@ -44,8 +43,6 @@ require (
 require (
 	github.com/apex/log v1.9.0 // indirect
 	github.com/bwmarrin/discordgo v0.28.1 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/snappy v0.0.1 // indirect
@@ -59,7 +56,6 @@ require (
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.3.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/samber/lo v1.38.1 // indirect
@@ -89,4 +85,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/sol-armada/sol-bot v1.9.1 => ../../sol-bot
+replace github.com/sol-armada/sol-bot v1.9.5 => ../../sol-bot

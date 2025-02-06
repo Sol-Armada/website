@@ -110,6 +110,9 @@ export const Token = class Token {
         this.amount = tokenJson.amount
         this.attendanceId = tokenJson.attendance_id
 
+        this.member = tokenJson.member
+        this.giver = tokenJson.giver
+
         this.createdAt = new Date(tokenJson.created_at)
     }
 
