@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/samber/slog-echo v1.12.5
-	github.com/sol-armada/sol-bot v1.9.5
+	github.com/sol-armada/sol-bot v1.9.6
 	github.com/spf13/viper v1.18.2
 	go.mongodb.org/mongo-driver v1.15.0
 )
@@ -85,4 +85,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/sol-armada/sol-bot v1.9.5 => ../../sol-bot
+// replace github.com/sol-armada/sol-bot v1.9.5 => ../../sol-bot
