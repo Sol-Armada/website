@@ -15,9 +15,10 @@ import (
 )
 
 var attendanceActions = map[string]Action{
-	"list":    listAttendance,
-	"count":   getAttendanceCount,
-	"records": getMemberAttendanceRecords,
+	"list":                listAttendance,
+	"count":               getAttendanceCount,
+	"records":             getMemberAttendanceRecords,
+	"unique_member_count": getUniqueMemberCount,
 }
 
 func watchForAttendance(ctx context.Context, hub *Hub) {
@@ -144,5 +145,31 @@ func getMemberAttendanceRecords(_ context.Context, _ *Client, id any) CommandRes
 	}
 
 	cr.Result = records
+	return cr
+}
+
+func getUniqueMemberCount(_ context.Context, _ *Client, daysRaw any) CommandResponse {
+	logger := slog.Default()
+
+	cr := CommandResponse{
+		Thing:  "attendance",
+		Action: "unique_member_count",
+	}
+
+	days, err := strconv.Atoi(daysRaw.(string))
+	if err != nil {
+		logger.Error("failed to parse days", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	count, err := attndnc.GetUniqueMemberCount(days)
+	if err != nil {
+		logger.Error("failed to get unique member count", "error", err)
+		cr.Error = "internal_error"
+		return cr
+	}
+
+	cr.Result = count
 	return cr
 }

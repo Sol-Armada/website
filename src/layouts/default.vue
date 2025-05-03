@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <template>
     <v-app>
-        <Navigation v-if="me.isOfficer" />
+        <Navigation v-if="me?.isOfficer" />
 
         <v-main class="d-flex justify-center" style="min-height: 300px;">
             <router-view />

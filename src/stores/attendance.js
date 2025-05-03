@@ -84,6 +84,28 @@ export const useAttendanceStore = defineStore("attendance", {
                     connectionStore.send('attendance', 'records', id)
                 }, 500)
             })
+        },
+
+        async getUniqueMembers(days = 90) {
+            return new Promise((resolve) => {
+                const errorStore = useErrorStore()
+                const connectionStore = useConnectionStore()
+                connectionStore.addListener('attendance', 'unique_member_count').then((commandResponse) => {
+                    // handle errors
+                    if (commandResponse.error) {
+                        errorStore.$patch({ error: commandResponse.error, show: true })
+                        return
+                    }
+
+                    resolve(commandResponse.result)
+                }).catch((error) => {
+                    console.log(error)
+                })
+
+                setTimeout(() => {
+                    connectionStore.send('attendance', 'unique_member_count', days)
+                }, 500)
+            })
         }
     }
 })

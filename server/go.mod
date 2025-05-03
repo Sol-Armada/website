@@ -85,4 +85,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// replace github.com/sol-armada/sol-bot v1.9.5 => ../../sol-bot
+replace github.com/sol-armada/sol-bot v1.9.6 => ../../sol-bot
