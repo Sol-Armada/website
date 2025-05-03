@@ -15,12 +15,12 @@ export const useAppStore = defineStore('app', () => {
     const attendanceStore = useAttendanceStore()
     const tokensStore = useTokensStore()
 
-    const loggedIn = ref(false)
-    const token = ref(null)
-    const me = ref(null)
-    const onboarded = ref(false)
+    const loggedIn = ref(localStorage.getItem('logged_in') || false)
+    const token = ref(localStorage.getItem('token') || null)
+    const me = ref(JSON.parse(localStorage.getItem('me')) || null)
+    const onboarded = ref(localStorage.getItem('onboarded') || false)
 
-    const version = ref(null)
+    const version = ref(localStorage.getItem('version') || null)
 
     function bindEvents() {
         loggedIn.value = localStorage.getItem('logged_in')
@@ -77,6 +77,12 @@ export const useAppStore = defineStore('app', () => {
 
             const member = new Member(commandResponse.result)
             membersStore.members.set(member.id, member)
+
+            if (member.id == me.value.id) {
+                console.log("updating me")
+                me.value = member
+                localStorage.setItem('me', JSON.stringify(me.value))
+            }
         })
 
         connectionStore.addForeverListener('attendance', 'get', (commandResponse) => {

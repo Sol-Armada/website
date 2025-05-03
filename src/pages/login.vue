@@ -53,15 +53,20 @@ onMounted(() => {
     if (code.value) {
         appStore.login(code.value).then((res) => {
             if (res) {
-                console.log("LOGGED IN")
                 appStore.getMe().then(() => {
-                    console.log("GOT ME")
                     if (appStore.me && appStore.me.onboarded) {
                         window.location.href = "/"
                     } else {
                         window.location.href = "/onboard"
                     }
                 })
+            }
+        }).catch((err) => {
+            appStore.loggingIn = false
+            if (err === "invalid_grant") {
+                window.location.href = "/login"
+            } else {
+                appStore.error = "An error occurred. Please try again."
             }
         })
     }
