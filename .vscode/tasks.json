@@ -7,7 +7,24 @@
             "label": "yarn dev",
             "type": "shell",
             "command": "yarn dev",
-            "isBackground": true
+            "isBackground": true,
+            "problemMatcher": [
+                {
+                    "owner": "vite",
+                    "fileLocation": [
+                        "relative",
+                        "${workspaceFolder}"
+                    ],
+                    "pattern": {
+                        "regexp": "^.*$"
+                    },
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^[\\s\\S]*$",
+                        "endsPattern": "VITE v\\d+\\.\\d+\\.\\d+.*ready in"
+                    }
+                }
+            ]
         },
         {
             "label": "Terminate All Tasks",

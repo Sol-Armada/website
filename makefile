@@ -13,7 +13,7 @@ build-web-beta:
 	@yarn build-beta
 
 build-server: clean
-	cd server && go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/website ./
+	cd server && go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/api ./
 
 build-production: build-web-production build-server
 
