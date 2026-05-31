@@ -1,6 +1,7 @@
-.PHONY: clean build build-web build-server dev-web dev-server dev
 
-version := $(shell git describe --tags --abbrev=0)
+.PHONY: clean build build-arm build-web build-server dev-web dev-server dev
+
+version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 hash := $(shell git rev-parse --short HEAD)
 
 clean:
@@ -14,6 +15,9 @@ build-web-beta:
 
 build-server: clean
 	cd api && go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/api ./cmd/server
+
+build-arm: clean
+	cd api && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/api-arm64 ./cmd/server
 
 build-production: build-web-production build-server
 
