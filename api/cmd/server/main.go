@@ -12,6 +12,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
+
+	"github.com/sol-armada/website/internal/auth"
+	"github.com/sol-armada/website/internal/handlers"
+	appMiddleware "github.com/sol-armada/website/internal/middleware"
 )
 
 var (
@@ -43,19 +47,42 @@ func main() {
 	}).Info("Starting Sol Armada Website API")
 
 	// TODO: Initialize database connection
-	// TODO: Initialize auth/OAuth
-	// TODO: Initialize middleware stack
-	// TODO: Register route handlers
+
+	// Initialize auth services
+	tokenService := auth.NewTokenService(
+		cfg.Auth.JWTSecret,
+		"sol-armada-api",
+		cfg.Auth.SessionExpiryHours,
+	)
+	cookieService := auth.NewCookieService(cfg.Server.Environment, "")
+
+	// Initialize middleware
+	authMiddleware := appMiddleware.NewAuthMiddleware(tokenService, cookieService)
+
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(
+		cfg.Discord.ClientID,
+		cfg.Discord.ClientSecret,
+		cfg.Discord.RedirectURI,
+		cfg.Discord.Scopes,
+		tokenService,
+		cookieService,
+		cfg.Discord.GuildID,
+		cfg.Roles.AdminRoleID,
+		cfg.Roles.ModeratorRoleID,
+		log,
+	)
 
 	// Setup Echo router
 	e := echo.New()
 	e.HideBanner = true
 
-	// Add middleware
+	// Add global middleware
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: `{"time":"${time_rfc3339_nano}","method":"${method}","path":"${path}","status":${status},"latency_ms":${latency_ms},"error":"${error}"}\n`,
 	}))
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORS())
 
 	// Health check endpoint
 	e.GET("/health", func(c echo.Context) error {
@@ -73,6 +100,19 @@ func main() {
 			"hash":    hash,
 		})
 	})
+
+	// Auth routes
+	authGroup := e.Group("/auth")
+	authGroup.GET("/login", authHandler.Login)
+	authGroup.GET("/callback", authHandler.Callback)
+	authGroup.POST("/logout", authHandler.Logout, authMiddleware.RequireAuth)
+	authGroup.GET("/me", authHandler.Me, authMiddleware.RequireAuth)
+
+	// API routes (protected)
+	api := e.Group("/api")
+	api.Use(authMiddleware.RequireAuth)
+	
+	// TODO: Add API route handlers here
 
 	// Start server in a goroutine
 	go func() {
