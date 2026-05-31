@@ -87,7 +87,7 @@ func main() {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	}
-	
+
 	redisClient, err := storage.NewRedisClient(redisConfig, log)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to connect to Redis")
@@ -164,9 +164,6 @@ func main() {
 	// Database optimization
 	if solbotClient != nil && solbotClient.Pool != nil {
 		database.OptimizePool(solbotClient.Pool, log)
-		if err := database.ExecuteOptimizations(solbotClient.Pool, log); err != nil {
-			log.WithError(err).Warn("Failed to execute database optimizations")
-		}
 	}
 
 	// Add rate limiting for API routes (10 requests per second, burst 20)
