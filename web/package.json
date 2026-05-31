@@ -4,8 +4,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vue-tsc && vite build",
-        "build-beta": "vue-tsc && vite build --mode beta",
+        "build": "vite build",
+        "build-beta": "vite build --mode beta",
         "preview": "vite preview",
         "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts",
         "type-check": "vue-tsc --noEmit"
