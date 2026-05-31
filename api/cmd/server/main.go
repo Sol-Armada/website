@@ -16,6 +16,8 @@ import (
 	"github.com/sol-armada/website/internal/auth"
 	"github.com/sol-armada/website/internal/handlers"
 	appMiddleware "github.com/sol-armada/website/internal/middleware"
+	"github.com/sol-armada/website/internal/service"
+	"github.com/sol-armada/website/internal/storage"
 )
 
 var (
@@ -46,7 +48,37 @@ func main() {
 		"env":     cfg.Server.Environment,
 	}).Info("Starting Sol Armada Website API")
 
-	// TODO: Initialize database connection
+	// Initialize database connection (read-only for sol-bot member data)
+	dbConfig := storage.Config{
+		DSN:                cfg.Database.DSN,
+		MaxConnections:     int32(cfg.Database.MaxConnections),
+		IdleTimeoutSeconds: cfg.Database.IdleTimeoutSeconds,
+	}
+	
+	db, err := storage.NewDB(context.Background(), dbConfig, log)
+	if err != nil {
+		log.WithError(err).Fatal("Failed to connect to database")
+	}
+	defer db.Close()
+
+	// Initialize Redis connection for sessions
+	redisConfig := storage.RedisConfig{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	}
+	
+	redisClient, err := storage.NewRedisClient(redisConfig, log)
+	if err != nil {
+		log.WithError(err).Fatal("Failed to connect to Redis")
+	}
+	defer redisClient.Close()
+
+	// Initialize storage layer
+	sessionStorage := storage.NewRedisSessionStorage(redisClient)
+
+	// Initialize services
+	sessionService := service.NewSessionService(sessionStorage, log)
 
 	// Initialize auth services
 	tokenService := auth.NewTokenService(
@@ -67,6 +99,7 @@ func main() {
 		cfg.Discord.Scopes,
 		tokenService,
 		cookieService,
+		sessionService,
 		cfg.Discord.GuildID,
 		cfg.Roles.AdminRoleID,
 		cfg.Roles.ModeratorRoleID,

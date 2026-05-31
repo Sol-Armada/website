@@ -16,6 +16,7 @@ import (
 
 	"github.com/sol-armada/website/internal/auth"
 	"github.com/sol-armada/website/internal/dto"
+	"github.com/sol-armada/website/internal/service"
 )
 
 const (
@@ -26,13 +27,14 @@ const (
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	oauthConfig   *oauth2.Config
-	tokenService  *auth.TokenService
-	cookieService *auth.CookieService
-	guildID       string // Required guild ID for access
-	adminRoleID   string
-	modRoleID     string
-	log           *logrus.Logger
+	oauthConfig     *oauth2.Config
+	tokenService    *auth.TokenService
+	cookieService   *auth.CookieService
+	sessionService  *service.SessionService
+	guildID         string // Required guild ID for access
+	adminRoleID     string
+	modRoleID       string
+	log             *logrus.Logger
 }
 
 // NewAuthHandler creates a new auth handler
@@ -41,6 +43,7 @@ func NewAuthHandler(
 	scopes []string,
 	tokenService *auth.TokenService,
 	cookieService *auth.CookieService,
+	sessionService *service.SessionService,
 	guildID, adminRoleID, modRoleID string,
 	log *logrus.Logger,
 ) *AuthHandler {
@@ -55,12 +58,13 @@ func NewAuthHandler(
 				TokenURL: DiscordTokenURL,
 			},
 		},
-		tokenService:  tokenService,
-		cookieService: cookieService,
-		guildID:       guildID,
-		adminRoleID:   adminRoleID,
-		modRoleID:     modRoleID,
-		log:           log,
+		tokenService:   tokenService,
+		cookieService:  cookieService,
+		sessionService: sessionService,
+		guildID:        guildID,
+		adminRoleID:    adminRoleID,
+		modRoleID:      modRoleID,
+		log:            log,
 	}
 }
 
@@ -160,8 +164,9 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 	// Map Discord roles to application roles
 	userRoles := h.mapDiscordRoles(guildMember.Roles)
 
-	// Generate user ID (in real implementation, this would be from database)
-	userID := fmt.Sprintf("user_%s", discordUser.ID)
+	// Use Discord ID directly as user ID (no database user table)
+	userID := discordUser.ID
+	avatarURL := fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", discordUser.ID, discordUser.Avatar)
 
 	// Generate JWT token
 	jwtToken, err := h.tokenService.GenerateToken(
@@ -174,13 +179,25 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 	if err != nil {
 		h.log.WithError(err).Error("Failed to generate JWT")
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error: "token_generation_failed",
+			Error:   "token_generation_failed",
+			Message: "Failed to create session",
+		})
+	}
+
+	// Create session in Redis
+	ctx := context.Background()
+	sessionExpiry := 7 * 24 // 7 days in hours
+	_, err = h.sessionService.CreateSession(ctx, userID, jwtToken, sessionExpiry)
+	if err != nil {
+		h.log.WithError(err).Error("Failed to create session")
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "session_creation_failed",
 			Message: "Failed to create session",
 		})
 	}
 
 	// Set session cookie
-	h.cookieService.SetSessionCookie(c, jwtToken, 7*24*60*60) // 7 days
+	h.cookieService.SetSessionCookie(c, jwtToken, sessionExpiry*60*60) // Convert hours to seconds
 
 	// Generate and set CSRF token
 	csrfToken := auth.GenerateCSRFToken()
@@ -193,7 +210,7 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 			DiscordID: discordUser.ID,
 			Username:  discordUser.Username,
 			Email:     discordUser.Email,
-			Avatar:    fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", discordUser.ID, discordUser.Avatar),
+			Avatar:    avatarURL,
 			Roles:     userRoles,
 		},
 		CSRF: csrfToken,

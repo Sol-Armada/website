@@ -32,3 +32,4 @@ dev: build-web-production
 	@echo "Frontend: http://localhost:5173"
 	@echo "Backend: http://localhost:8080"
 
+
