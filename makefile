@@ -1,5 +1,5 @@
 
-.PHONY: clean build build-arm build-web build-server dev-web dev-server dev
+.PHONY: clean build build-arm build-web build-server dev-web dev-server dev test test-api test-web
 
 version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 hash := $(shell git rev-parse --short HEAD)
@@ -35,5 +35,13 @@ dev: build-web-production
 	@echo "Starting development environment..."
 	@echo "Frontend: http://localhost:5173"
 	@echo "Backend: http://localhost:8080"
+
+test-api:
+	cd api && go test ./...
+
+test-web:
+	cd web && npm run test:run
+
+test: test-api test-web
 
 

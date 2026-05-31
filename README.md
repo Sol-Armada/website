@@ -81,6 +81,26 @@ make build-beta         # Beta: web + server
 
 Output: `./bin/api` (backend binary)
 
+## Testing
+
+### Backend unit tests
+
+```bash
+cd api && go test ./...
+```
+
+### Frontend unit tests
+
+```bash
+cd web && npm run test:run
+```
+
+### Run all tests
+
+```bash
+make test
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -111,8 +131,9 @@ Backend is deployed as a systemd service or container. Frontend is built as stat
 - **Phase 4**: Frontend shell & design system
 - **Phase 5**: Member pages (dashboard, profile)
 - **Phase 6**: Admin pages (overview, attendance, token ledger, members)
-- **Phase 7**: Hardening & observability
-- **Phase 8**: QA & rollout
+- **Phase 7**: Hardening & observability ✅
+- **Phase 8**: Deployment & DevOps ✅
+- **Phase 9**: Testing & documentation ✅
 
 ## Tech Stack
 
