@@ -82,9 +82,44 @@
                     </v-card-title>
                     <v-divider />
                     <v-card-text>
-                        <p class="text-center text-medium-emphasis">
-                            Detailed stats coming in Phase 5
-                        </p>
+                        <v-alert v-if="error" type="error" variant="tonal" dense>
+                            {{ error }}
+                        </v-alert>
+                        <div v-else-if="loading" class="text-center py-4">
+                            <v-progress-circular indeterminate color="primary" />
+                        </div>
+                        <v-list v-else density="compact" lines="one">
+                            <v-list-item>
+                                <v-list-item-title>Rank</v-list-item-title>
+                                <template v-slot:append>
+                                    <v-chip color="secondary" size="small">{{ profileStats.rank }}</v-chip>
+                                </template>
+                            </v-list-item>
+                            <v-list-item>
+                                <v-list-item-title>Attendance</v-list-item-title>
+                                <template v-slot:append>
+                                    <strong>{{ profileStats.attendanceCount }}</strong>
+                                </template>
+                            </v-list-item>
+                            <v-list-item>
+                                <v-list-item-title>Token Balance</v-list-item-title>
+                                <template v-slot:append>
+                                    <strong>{{ profileStats.tokensBalance.toLocaleString() }}</strong>
+                                </template>
+                            </v-list-item>
+                            <v-list-item v-if="profileStats.memberSince">
+                                <v-list-item-title>Member Since</v-list-item-title>
+                                <template v-slot:append>
+                                    <span>{{ profileStats.memberSince }}</span>
+                                </template>
+                            </v-list-item>
+                            <v-list-item v-if="profileStats.rsiHandle">
+                                <v-list-item-title>RSI Handle</v-list-item-title>
+                                <template v-slot:append>
+                                    <span>{{ profileStats.rsiHandle }}</span>
+                                </template>
+                            </v-list-item>
+                        </v-list>
                     </v-card-text>
                 </v-card>
 
@@ -107,9 +142,20 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import memberService from '@/services/memberService'
 
 const authStore = useAuthStore()
+const loading = ref(true)
+const error = ref<string | null>(null)
+const profileStats = ref({
+    rank: 'Recruit',
+    attendanceCount: 0,
+    tokensBalance: 0,
+    memberSince: '',
+    rsiHandle: '',
+})
 
 const getRoleColor = (role: string) => {
     const colors: Record<string, string> = {
@@ -119,6 +165,26 @@ const getRoleColor = (role: string) => {
     }
     return colors[role] || 'grey'
 }
+
+onMounted(async () => {
+    loading.value = true
+    error.value = null
+
+    try {
+        const profile = await memberService.getProfile()
+        profileStats.value = {
+            rank: profile.rank,
+            attendanceCount: profile.attendanceCount,
+            tokensBalance: profile.tokensBalance,
+            memberSince: profile.memberSince ? new Date(profile.memberSince).toLocaleDateString() : '',
+            rsiHandle: profile.rsiHandle || '',
+        }
+    } catch (err: any) {
+        error.value = err.message || 'Failed to load profile statistics'
+    } finally {
+        loading.value = false
+    }
+})
 </script>
 
 <style scoped>

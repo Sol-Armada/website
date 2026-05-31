@@ -9,6 +9,9 @@
                 <p class="text-body-1 text-medium-emphasis mt-2">
                     View your attendance, earned tokens, and rank
                 </p>
+                <v-alert v-if="error" type="error" variant="tonal" class="mt-4" dense>
+                    {{ error }}
+                </v-alert>
             </v-col>
         </v-row>
 
@@ -129,11 +132,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import memberService from '@/services/memberService'
 
 const authStore = useAuthStore()
 const loading = ref(true)
+const error = ref<string | null>(null)
 
-// Mock stats - will be replaced with API calls in Phase 5
 const stats = ref({
     attendance: 0,
     tokens: 0,
@@ -186,16 +190,28 @@ const getActivityIcon = (type: string) => {
 }
 
 onMounted(async () => {
-    // TODO: Fetch member stats from API in Phase 5
-    // For now, show mock data
-    setTimeout(() => {
+    loading.value = true
+    error.value = null
+
+    try {
+        const response = await memberService.getDashboard()
+
         stats.value = {
-            attendance: 0,
-            tokens: 0,
-            rank: 'Recruit',
+            attendance: response.attendance,
+            tokens: response.tokens,
+            rank: response.rank,
         }
+
+        recentActivity.value = response.recentActivity.map((activity) => ({
+            type: activity.type,
+            title: activity.title,
+            date: new Date(activity.date).toLocaleString(),
+        }))
+    } catch (err: any) {
+        error.value = err.message || 'Failed to load dashboard data'
+    } finally {
         loading.value = false
-    }, 500)
+    }
 })
 </script>
 

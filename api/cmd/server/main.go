@@ -3,17 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
+	"github.com/sol-armada/sol-bot/attendance"
+	solbotdb "github.com/sol-armada/sol-bot/database"
+	solbotpg "github.com/sol-armada/sol-bot/database/postgresql"
+	"github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/tokens"
 
 	"github.com/sol-armada/website/internal/auth"
+	"github.com/sol-armada/website/internal/cache"
+	"github.com/sol-armada/website/internal/database"
 	"github.com/sol-armada/website/internal/handlers"
 	appMiddleware "github.com/sol-armada/website/internal/middleware"
 	"github.com/sol-armada/website/internal/service"
@@ -49,17 +60,26 @@ func main() {
 	}).Info("Starting Sol Armada Website API")
 
 	// Initialize database connection (read-only for sol-bot member data)
-	dbConfig := storage.Config{
-		DSN:                cfg.Database.DSN,
-		MaxConnections:     int32(cfg.Database.MaxConnections),
-		IdleTimeoutSeconds: cfg.Database.IdleTimeoutSeconds,
-	}
-	
-	db, err := storage.NewDB(context.Background(), dbConfig, log)
+	solbotCfg, err := toSolBotPostgresConfig(cfg.Database.DSN, cfg.Database.MaxConnections)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to connect to database")
+		log.WithError(err).Fatal("Invalid database DSN")
 	}
-	defer db.Close()
+
+	solbotClient, err := solbotpg.New(context.Background(), solbotCfg)
+	if err != nil {
+		log.WithError(err).Fatal("Failed to initialize sol-bot postgresql client")
+	}
+	defer solbotClient.Close()
+
+	if err := members.Setup(); err != nil {
+		log.WithError(err).Fatal("Failed to initialize sol-bot members backend")
+	}
+	if err := attendance.Setup(); err != nil {
+		log.WithError(err).Fatal("Failed to initialize sol-bot attendance backend")
+	}
+	if err := tokens.Setup(); err != nil {
+		log.WithError(err).Fatal("Failed to initialize sol-bot tokens backend")
+	}
 
 	// Initialize Redis connection for sessions
 	redisConfig := storage.RedisConfig{
@@ -74,11 +94,34 @@ func main() {
 	}
 	defer redisClient.Close()
 
+	// Initialize cache layer
+	redisCache, err := cache.NewRedisCache(cfg.Redis.Addr, log)
+	if err != nil {
+		log.WithError(err).Warn("Failed to initialize Redis cache (continuing without caching)")
+		redisCache = nil
+	}
+	if redisCache != nil {
+		defer redisCache.Close()
+	}
+
 	// Initialize storage layer
 	sessionStorage := storage.NewRedisSessionStorage(redisClient)
 
 	// Initialize services
 	sessionService := service.NewSessionService(sessionStorage, log)
+	memberService := service.NewMemberService(log)
+	adminService := service.NewAdminService(log)
+
+	// Wrap admin service with caching if Redis is available
+	var adminServiceInterface handlers.AdminServiceInterface = adminService
+
+	if redisCache != nil {
+		cachedAdminService := service.NewCachedAdminService(adminService, redisCache, log)
+		adminServiceInterface = cachedAdminService
+		log.Info("Admin service caching enabled")
+	} else {
+		log.Warn("Admin service caching disabled")
+	}
 
 	// Initialize auth services
 	tokenService := auth.NewTokenService(
@@ -105,17 +148,29 @@ func main() {
 		cfg.Roles.ModeratorRoleID,
 		log,
 	)
+	memberHandler := handlers.NewMemberHandler(memberService, log)
+	adminHandler := handlers.NewAdminHandler(adminServiceInterface, log)
 
 	// Setup Echo router
 	e := echo.New()
 	e.HideBanner = true
 
 	// Add global middleware
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: `{"time":"${time_rfc3339_nano}","method":"${method}","path":"${path}","status":${status},"latency_ms":${latency_ms},"error":"${error}"}\n`,
-	}))
+	e.Use(appMiddleware.LoggingMiddleware(log))
+	e.Use(appMiddleware.ErrorLoggerMiddleware(log))
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORS())
+
+	// Database optimization
+	if solbotClient != nil && solbotClient.Pool != nil {
+		database.OptimizePool(solbotClient.Pool, log)
+		if err := database.ExecuteOptimizations(solbotClient.Pool, log); err != nil {
+			log.WithError(err).Warn("Failed to execute database optimizations")
+		}
+	}
+
+	// Add rate limiting for API routes (10 requests per second, burst 20)
+	apiRateLimiter := appMiddleware.NewRateLimiter(10, 20)
 
 	// Health check endpoint
 	e.GET("/health", func(c echo.Context) error {
@@ -144,8 +199,17 @@ func main() {
 	// API routes (protected)
 	api := e.Group("/api")
 	api.Use(authMiddleware.RequireAuth)
-	
-	// TODO: Add API route handlers here
+	api.Use(apiRateLimiter.Middleware())
+
+	memberAPI := api.Group("/member")
+	memberAPI.GET("/dashboard", memberHandler.GetDashboard)
+	memberAPI.GET("/profile", memberHandler.GetProfile)
+
+	adminAPI := api.Group("/admin")
+	adminAPI.GET("/overview", adminHandler.GetOverview)
+	adminAPI.GET("/attendance", adminHandler.GetAttendance)
+	adminAPI.GET("/token-ledger", adminHandler.GetTokenLedger)
+	adminAPI.GET("/members", adminHandler.GetMembers)
 
 	// Start server in a goroutine
 	go func() {
@@ -169,4 +233,59 @@ func main() {
 	}
 
 	log.Info("Server stopped")
+}
+
+func toSolBotPostgresConfig(dsn string, maxConns int) (solbotdb.PostgresConfig, error) {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return solbotdb.PostgresConfig{}, fmt.Errorf("parse dsn: %w", err)
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return solbotdb.PostgresConfig{}, fmt.Errorf("dsn host is empty")
+	}
+
+	port := 5432
+	if rawPort := u.Port(); rawPort != "" {
+		parsedPort, err := strconv.Atoi(rawPort)
+		if err != nil {
+			return solbotdb.PostgresConfig{}, fmt.Errorf("invalid dsn port: %w", err)
+		}
+		port = parsedPort
+	} else if tcpAddr, err := net.LookupPort("tcp", "postgres"); err == nil {
+		port = tcpAddr
+	}
+
+	databaseName := strings.TrimPrefix(u.Path, "/")
+	if databaseName == "" {
+		return solbotdb.PostgresConfig{}, fmt.Errorf("dsn database name is empty")
+	}
+
+	username := ""
+	password := ""
+	if u.User != nil {
+		username = u.User.Username()
+		password, _ = u.User.Password()
+	}
+
+	if username == "" {
+		return solbotdb.PostgresConfig{}, fmt.Errorf("dsn username is empty")
+	}
+
+	sslMode := u.Query().Get("sslmode")
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+
+	return solbotdb.PostgresConfig{
+		Host:     host,
+		Port:     port,
+		Username: username,
+		Password: password,
+		Database: databaseName,
+		SSLMode:  sslMode,
+		MaxConns: int32(maxConns),
+		MinConns: 1,
+	}, nil
 }
