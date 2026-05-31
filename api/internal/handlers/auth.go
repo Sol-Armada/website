@@ -1,17 +1,19 @@
 package handlers
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/labstack/echo/v4"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 
 	"github.com/sol-armada/website/internal/auth"
@@ -20,32 +22,33 @@ import (
 )
 
 const (
-	DiscordAPIURL      = "https://discord.com/api/v10"
-	DiscordAuthURL     = "https://discord.com/api/oauth2/authorize"
-	DiscordTokenURL    = "https://discord.com/api/oauth2/token"
+	DiscordAPIURL   = "https://discord.com/api/v10"
+	DiscordAuthURL  = "https://discord.com/oauth2/authorize"
+	DiscordTokenURL = "https://discord.com/api/oauth2/token"
 )
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	oauthConfig     *oauth2.Config
-	tokenService    *auth.TokenService
-	cookieService   *auth.CookieService
-	sessionService  *service.SessionService
-	guildID         string // Required guild ID for access
-	adminRoleID     string
-	modRoleID       string
-	log             *logrus.Logger
+	oauthConfig    *oauth2.Config
+	frontendURL    string
+	tokenService   *auth.TokenService
+	cookieService  *auth.CookieService
+	sessionService *service.SessionService
+	guildID        string // Required guild ID for access
+	adminRoleID    string
+	modRoleID      string
+	log            *slog.Logger
 }
 
 // NewAuthHandler creates a new auth handler
 func NewAuthHandler(
-	clientID, clientSecret, redirectURI string,
+	clientID, clientSecret, redirectURI, frontendURL string,
 	scopes []string,
 	tokenService *auth.TokenService,
 	cookieService *auth.CookieService,
 	sessionService *service.SessionService,
 	guildID, adminRoleID, modRoleID string,
-	log *logrus.Logger,
+	log *slog.Logger,
 ) *AuthHandler {
 	return &AuthHandler{
 		oauthConfig: &oauth2.Config{
@@ -59,6 +62,7 @@ func NewAuthHandler(
 			},
 		},
 		tokenService:   tokenService,
+		frontendURL:    strings.TrimRight(frontendURL, "/"),
 		cookieService:  cookieService,
 		sessionService: sessionService,
 		guildID:        guildID,
@@ -72,7 +76,7 @@ func NewAuthHandler(
 func (h *AuthHandler) Login(c echo.Context) error {
 	// Generate random state for CSRF protection
 	state := generateRandomState()
-	
+
 	// Determine if we should use secure cookies
 	isProduction := h.cookieService != nil // Will be set properly in production
 
@@ -95,23 +99,32 @@ func (h *AuthHandler) Login(c echo.Context) error {
 
 // Callback handles the OAuth callback from Discord
 func (h *AuthHandler) Callback(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	// Handle OAuth provider error responses (e.g. user pressed "Cancel" on Discord consent page).
+	if oauthError := c.QueryParam("error"); oauthError != "" {
+		errorMessage := c.QueryParam("error_description")
+		if errorMessage == "" {
+			errorMessage = "Authentication was cancelled"
+		}
+		h.log.Warn("OAuth callback returned error", "error", oauthError, "description", errorMessage)
+		return c.Redirect(
+			http.StatusFound,
+			fmt.Sprintf("%s/auth/callback?error=%s&message=%s", h.frontendURL, url.QueryEscape(oauthError), url.QueryEscape(errorMessage)),
+		)
+	}
+
 	// Verify state parameter
 	stateCookie, err := c.Cookie("oauth_state")
 	if err != nil {
-		h.log.WithError(err).Error("Missing OAuth state cookie")
-		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid_state",
-			Message: "OAuth state mismatch",
-		})
+		h.log.Error("Missing OAuth state cookie", "error", err)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=invalid_state&message=%s", h.frontendURL, url.QueryEscape("OAuth state mismatch")))
 	}
 
 	state := c.QueryParam("state")
 	if state == "" || state != stateCookie.Value {
 		h.log.Error("OAuth state mismatch")
-		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid_state",
-			Message: "OAuth state mismatch",
-		})
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=invalid_state&message=%s", h.frontendURL, url.QueryEscape("OAuth state mismatch")))
 	}
 
 	// Clear state cookie
@@ -126,39 +139,27 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 	// Exchange code for token
 	code := c.QueryParam("code")
 	if code == "" {
-		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "missing_code",
-			Message: "Authorization code missing",
-		})
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=missing_code&message=%s", h.frontendURL, url.QueryEscape("Authorization code missing")))
 	}
 
-	token, err := h.oauthConfig.Exchange(context.Background(), code)
+	token, err := h.oauthConfig.Exchange(ctx, code)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to exchange OAuth code")
-		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error: "exchange_failed",
-			Message: "Failed to exchange authorization code",
-		})
+		h.log.Error("Failed to exchange OAuth code", "error", err)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=exchange_failed&message=%s", h.frontendURL, url.QueryEscape("Failed to exchange authorization code")))
 	}
 
 	// Fetch user info from Discord
 	discordUser, err := h.fetchDiscordUser(token.AccessToken)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to fetch Discord user")
-		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error: "user_fetch_failed",
-			Message: "Failed to fetch user information",
-		})
+		h.log.Error("Failed to fetch Discord user", "error", err)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=user_fetch_failed&message=%s", h.frontendURL, url.QueryEscape("Failed to fetch user information")))
 	}
 
 	// Fetch guild member info to get roles
-	guildMember, err := h.fetchGuildMember(token.AccessToken, discordUser.ID)
+	guildMember, err := h.fetchGuildMember(token.AccessToken)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to fetch guild member")
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error: "guild_access_denied",
-			Message: "You must be a member of the Sol Armada guild",
-		})
+		h.log.Error("Failed to fetch guild member", "error", err)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=guild_access_denied&message=%s", h.frontendURL, url.QueryEscape("You must be a member of the Sol Armada guild")))
 	}
 
 	// Map Discord roles to application roles
@@ -166,34 +167,28 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 
 	// Use Discord ID directly as user ID (no database user table)
 	userID := discordUser.ID
-	avatarURL := fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", discordUser.ID, discordUser.Avatar)
 
-	// Generate JWT token
+	// Generate JWT token with avatar URL
+	avatarURL := fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", discordUser.ID, discordUser.Avatar)
 	jwtToken, err := h.tokenService.GenerateToken(
 		userID,
 		discordUser.ID,
 		discordUser.Username,
 		discordUser.Email,
+		avatarURL,
 		userRoles,
 	)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to generate JWT")
-		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "token_generation_failed",
-			Message: "Failed to create session",
-		})
+		h.log.Error("Failed to generate JWT", "error", err)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=token_generation_failed&message=%s", h.frontendURL, url.QueryEscape("Failed to create session")))
 	}
 
 	// Create session in Redis
-	ctx := context.Background()
 	sessionExpiry := 7 * 24 // 7 days in hours
 	_, err = h.sessionService.CreateSession(ctx, userID, jwtToken, sessionExpiry)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to create session")
-		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "session_creation_failed",
-			Message: "Failed to create session",
-		})
+		h.log.Error("Failed to create session", "error", err)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=session_creation_failed&message=%s", h.frontendURL, url.QueryEscape("Failed to create session")))
 	}
 
 	// Set session cookie
@@ -203,20 +198,8 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 	csrfToken := auth.GenerateCSRFToken()
 	h.cookieService.SetCSRFCookie(c, csrfToken, 60*60) // 1 hour
 
-	// Return user info and CSRF token
-	response := dto.AuthResponse{
-		User: dto.UserDTO{
-			ID:        userID,
-			DiscordID: discordUser.ID,
-			Username:  discordUser.Username,
-			Email:     discordUser.Email,
-			Avatar:    avatarURL,
-			Roles:     userRoles,
-		},
-		CSRF: csrfToken,
-	}
-
-	return c.JSON(http.StatusOK, response)
+	// OAuth callback is browser-driven; redirect to frontend dashboard after cookies are set.
+	return c.Redirect(http.StatusFound, h.frontendURL+"/dashboard")
 }
 
 // Logout clears the session
@@ -233,6 +216,7 @@ func (h *AuthHandler) Me(c echo.Context) error {
 	discordID, _ := c.Get("discord_id").(string)
 	username, _ := c.Get("username").(string)
 	email, _ := c.Get("email").(string)
+	avatar, _ := c.Get("avatar").(string)
 	roles, _ := c.Get("roles").([]string)
 
 	user := dto.UserDTO{
@@ -240,6 +224,7 @@ func (h *AuthHandler) Me(c echo.Context) error {
 		DiscordID: discordID,
 		Username:  username,
 		Email:     email,
+		Avatar:    avatar,
 		Roles:     roles,
 	}
 
@@ -275,7 +260,7 @@ func (h *AuthHandler) fetchDiscordUser(accessToken string) (*dto.DiscordUser, er
 }
 
 // fetchGuildMember fetches guild member info from Discord API
-func (h *AuthHandler) fetchGuildMember(accessToken, userID string) (*dto.DiscordGuildMember, error) {
+func (h *AuthHandler) fetchGuildMember(accessToken string) (*dto.DiscordGuildMember, error) {
 	url := fmt.Sprintf("%s/users/@me/guilds/%s/member", DiscordAPIURL, h.guildID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -322,6 +307,6 @@ func (h *AuthHandler) mapDiscordRoles(discordRoles []string) []string {
 // generateRandomState generates a random state string for OAuth
 func generateRandomState() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }

@@ -9,10 +9,9 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "cwd": "${workspaceFolder}/server",
-            "program": "./server",
-            "preLaunchTask": "yarn dev",
-            "postDebugTask": "Terminate All Tasks"
+            "cwd": "${workspaceFolder}/api",
+            "program": "${workspaceFolder}/api/cmd/server",
+            "envFile": "${workspaceFolder}/api/.env"
         }
     ]
 }

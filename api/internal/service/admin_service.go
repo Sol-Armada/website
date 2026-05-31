@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"log/slog"
+
 	"github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/tokens"
@@ -51,10 +52,10 @@ type MemberSummary struct {
 }
 
 type AdminService struct {
-	logger *logrus.Logger
+	logger *slog.Logger
 }
 
-func NewAdminService(logger *logrus.Logger) *AdminService {
+func NewAdminService(logger *slog.Logger) *AdminService {
 	return &AdminService{logger: logger}
 }
 

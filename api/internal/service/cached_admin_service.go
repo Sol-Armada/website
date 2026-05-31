@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"log/slog"
+
 	"github.com/sol-armada/website/internal/cache"
 )
 
@@ -12,12 +13,12 @@ import (
 type CachedAdminService struct {
 	*AdminService
 	cache  *cache.RedisCache
-	logger *logrus.Logger
+	logger *slog.Logger
 	ttl    time.Duration
 }
 
 // NewCachedAdminService creates a cached admin service
-func NewCachedAdminService(adminService *AdminService, redisCache *cache.RedisCache, logger *logrus.Logger) *CachedAdminService {
+func NewCachedAdminService(adminService *AdminService, redisCache *cache.RedisCache, logger *slog.Logger) *CachedAdminService {
 	return &CachedAdminService{
 		AdminService: adminService,
 		cache:        redisCache,
@@ -33,7 +34,7 @@ func (cas *CachedAdminService) GetOverviewStats(ctx context.Context) (*AdminOver
 	// Try cache first
 	var stats *AdminOverviewStats
 	if err := cas.cache.GetJSON(ctx, key, &stats); err == nil {
-		cas.logger.WithField("key", key).Debug("Cache hit for overview stats")
+		cas.logger.Debug("Cache hit for overview stats", "key", key)
 		return stats, nil
 	}
 
@@ -45,7 +46,7 @@ func (cas *CachedAdminService) GetOverviewStats(ctx context.Context) (*AdminOver
 
 	// Store in cache
 	if err := cas.cache.Set(ctx, key, stats, cas.ttl); err != nil {
-		cas.logger.WithError(err).Warnf("Failed to cache stats")
+		cas.logger.Warn("Failed to cache stats", "error", err)
 	}
 
 	return stats, nil

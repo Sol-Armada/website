@@ -13,9 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"log/slog"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/sirupsen/logrus"
 	"github.com/sol-armada/sol-bot/attendance"
 	solbotdb "github.com/sol-armada/sol-bot/database"
 	solbotpg "github.com/sol-armada/sol-bot/database/postgresql"
@@ -37,48 +38,63 @@ var (
 )
 
 func main() {
-	log := logrus.New()
-	log.SetFormatter(&logrus.JSONFormatter{})
-
-	// Load configuration
-	cfg, err := Load()
+	// Load configuration first
+	cfg, err := load()
 	if err != nil {
-		log.WithError(err).Fatal("Failed to load configuration")
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Set log level
-	level, err := logrus.ParseLevel(cfg.Logging.Level)
-	if err != nil {
-		log.WithError(err).Fatal("Invalid log level")
+	// Parse log level
+	var logLevel slog.Level
+	if err := logLevel.UnmarshalText([]byte(cfg.Logging.Level)); err != nil {
+		logLevel = slog.LevelInfo
 	}
-	log.SetLevel(level)
 
-	log.WithFields(logrus.Fields{
-		"version": version,
-		"hash":    hash,
-		"env":     cfg.Server.Environment,
-	}).Info("Starting Sol Armada Website API")
+	var handler slog.Handler
+	handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: logLevel,
+	})
+	if cfg.Logging.CLI {
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: logLevel,
+		})
+	}
 
-	// Initialize database connection (read-only for sol-bot member data)
+	// Create logger with JSON handler and parsed level
+	log := slog.New(handler)
+
+	log.Info("Starting Sol Armada Website API",
+		"version", version,
+		"hash", hash,
+		"env", cfg.Server.Environment,
+	)
+
+	// Initialize database connection
 	solbotCfg, err := toSolBotPostgresConfig(cfg.Database.DSN, cfg.Database.MaxConnections)
 	if err != nil {
-		log.WithError(err).Fatal("Invalid database DSN")
+		log.Error("Invalid database DSN", "error", err)
+		os.Exit(1)
 	}
 
 	solbotClient, err := solbotpg.New(context.Background(), solbotCfg)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to initialize sol-bot postgresql client")
+		log.Error("Failed to initialize sol-bot postgresql client", "error", err)
+		os.Exit(1)
 	}
 	defer solbotClient.Close()
 
 	if err := members.Setup(); err != nil {
-		log.WithError(err).Fatal("Failed to initialize sol-bot members backend")
+		log.Error("Failed to initialize sol-bot members backend", "error", err)
+		os.Exit(1)
 	}
 	if err := attendance.Setup(); err != nil {
-		log.WithError(err).Fatal("Failed to initialize sol-bot attendance backend")
+		log.Error("Failed to initialize sol-bot attendance backend", "error", err)
+		os.Exit(1)
 	}
 	if err := tokens.Setup(); err != nil {
-		log.WithError(err).Fatal("Failed to initialize sol-bot tokens backend")
+		log.Error("Failed to initialize sol-bot tokens backend", "error", err)
+		os.Exit(1)
 	}
 
 	// Initialize Redis connection for sessions
@@ -90,14 +106,15 @@ func main() {
 
 	redisClient, err := storage.NewRedisClient(redisConfig, log)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to connect to Redis")
+		log.Error("Failed to connect to Redis", "error", err)
+		os.Exit(1)
 	}
 	defer redisClient.Close()
 
 	// Initialize cache layer
 	redisCache, err := cache.NewRedisCache(cfg.Redis.Addr, log)
 	if err != nil {
-		log.WithError(err).Warn("Failed to initialize Redis cache (continuing without caching)")
+		log.Warn("Failed to initialize Redis cache (continuing without caching)", "error", err)
 		redisCache = nil
 	}
 	if redisCache != nil {
@@ -139,6 +156,7 @@ func main() {
 		cfg.Discord.ClientID,
 		cfg.Discord.ClientSecret,
 		cfg.Discord.RedirectURI,
+		cfg.Server.FrontendURL,
 		cfg.Discord.Scopes,
 		tokenService,
 		cookieService,
@@ -171,7 +189,7 @@ func main() {
 
 	// Health check endpoint
 	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
+		return c.JSON(http.StatusOK, map[string]any{
 			"status":  "ok",
 			"version": version,
 			"hash":    hash,
@@ -180,7 +198,7 @@ func main() {
 
 	// Version endpoint
 	e.GET("/version", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
+		return c.JSON(http.StatusOK, map[string]any{
 			"version": version,
 			"hash":    hash,
 		})
@@ -210,9 +228,9 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		log.WithField("port", cfg.Server.Port).Info("Server listening")
+		log.Info("Server listening", "port", cfg.Server.Port)
 		if err := e.Start(":" + fmt.Sprintf("%d", cfg.Server.Port)); err != nil && err != http.ErrServerClosed {
-			log.WithError(err).Error("Server error")
+			log.Error("Server error", "error", err)
 		}
 	}()
 
@@ -226,7 +244,8 @@ func main() {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		log.WithError(err).Fatal("Server shutdown error")
+		log.Error("Server shutdown error", "error", err)
+		os.Exit(1)
 	}
 
 	log.Info("Server stopped")

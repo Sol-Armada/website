@@ -36,9 +36,6 @@
                         </div>
                         <v-progress-linear :model-value="attendanceProgress" color="primary" height="6" rounded
                             class="mt-4" />
-                        <div class="text-caption text-medium-emphasis mt-2">
-                            {{ stats.attendance }} events attended
-                        </div>
                     </v-card-text>
                 </v-card>
             </v-col>
@@ -62,9 +59,6 @@
                         </div>
                         <v-progress-linear :model-value="tokenProgress" color="accent" height="6" rounded
                             class="mt-4" />
-                        <div class="text-caption text-medium-emphasis mt-2">
-                            Lifetime earnings
-                        </div>
                     </v-card-text>
                 </v-card>
             </v-col>
@@ -86,9 +80,6 @@
                                 </div>
                             </div>
                         </div>
-                        <v-chip :color="getRankColor(stats.rank)" variant="flat" class="mt-4">
-                            {{ getRankTitle(stats.rank) }}
-                        </v-chip>
                     </v-card-text>
                 </v-card>
             </v-col>
@@ -155,21 +146,6 @@ const tokenProgress = computed(() => {
     // Mock progress calculation
     return Math.min((stats.value.tokens / 10000) * 100, 100)
 })
-
-const getRankColor = (rank: string) => {
-    const ranks: Record<string, string> = {
-        'Recruit': 'grey',
-        'Member': 'blue',
-        'Veteran': 'green',
-        'Elite': 'purple',
-        'Legend': 'orange',
-    }
-    return ranks[rank] || 'grey'
-}
-
-const getRankTitle = (rank: string) => {
-    return rank || 'Unranked'
-}
 
 const getActivityColor = (type: string) => {
     const colors: Record<string, string> = {

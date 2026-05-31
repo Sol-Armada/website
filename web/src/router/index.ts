@@ -74,15 +74,19 @@ const router = createRouter({
     routes,
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
     const authStore = useAuthStore()
     const requiresAuth = to.meta.requiresAuth as boolean
     const requiredRoles = (to.meta.requiredRoles as string[]) || []
 
     if (requiresAuth) {
+        // Check if user data is loaded, if not try to load it
         if (!authStore.isAuthenticated) {
-            next('/auth/login')
-            return
+            const isAuth = await authStore.checkAuth()
+            if (!isAuth) {
+                next('/auth/login')
+                return
+            }
         }
 
         if (requiredRoles.length > 0) {

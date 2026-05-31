@@ -43,6 +43,7 @@ func (m *AuthMiddleware) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		c.Set("discord_id", claims.DiscordID)
 		c.Set("username", claims.Username)
 		c.Set("email", claims.Email)
+		c.Set("avatar", claims.Avatar)
 		c.Set("roles", claims.Roles)
 
 		return next(c)
@@ -90,6 +91,7 @@ func (m *AuthMiddleware) OptionalAuth(next echo.HandlerFunc) echo.HandlerFunc {
 				c.Set("discord_id", claims.DiscordID)
 				c.Set("username", claims.Username)
 				c.Set("email", claims.Email)
+				c.Set("avatar", claims.Avatar)
 				c.Set("roles", claims.Roles)
 			}
 		}

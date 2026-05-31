@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strconv"
 
+	"log/slog"
+
 	"github.com/labstack/echo/v4"
-	"github.com/sirupsen/logrus"
 
 	"github.com/sol-armada/website/internal/dto"
 	"github.com/sol-armada/website/internal/service"
@@ -22,10 +24,10 @@ type AdminServiceInterface interface {
 
 type AdminHandler struct {
 	adminService AdminServiceInterface
-	logger       *logrus.Logger
+	logger       *slog.Logger
 }
 
-func NewAdminHandler(adminService AdminServiceInterface, logger *logrus.Logger) *AdminHandler {
+func NewAdminHandler(adminService AdminServiceInterface, logger *slog.Logger) *AdminHandler {
 	return &AdminHandler{
 		adminService: adminService,
 		logger:       logger,
@@ -44,7 +46,7 @@ func (h *AdminHandler) GetOverview(c echo.Context) error {
 
 	result, err := h.adminService.GetOverviewStats(c.Request().Context())
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to fetch admin overview")
+		h.logger.Error("Failed to fetch admin overview", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "admin_overview_failed",
 			Message: "Failed to fetch overview statistics",
@@ -79,14 +81,14 @@ func (h *AdminHandler) GetAttendance(c echo.Context) error {
 
 	result, err := h.adminService.GetAttendanceRecords(c.Request().Context(), limit, page)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to fetch attendance records")
+		h.logger.Error("Failed to fetch attendance records", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "attendance_fetch_failed",
 			Message: "Failed to fetch attendance records",
 		})
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"records": result,
 		"page":    page,
 		"limit":   limit,
@@ -118,14 +120,14 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 
 	result, err := h.adminService.GetTokenLedger(c.Request().Context(), limit, page)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to fetch token ledger")
+		h.logger.Error("Failed to fetch token ledger", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "token_ledger_failed",
 			Message: "Failed to fetch token ledger",
 		})
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"records": result,
 		"page":    page,
 		"limit":   limit,
@@ -159,14 +161,14 @@ func (h *AdminHandler) GetMembers(c echo.Context) error {
 
 	result, err := h.adminService.GetMembers(c.Request().Context(), limit, page, search)
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to fetch members")
+		h.logger.Error("Failed to fetch members", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "members_fetch_failed",
 			Message: "Failed to fetch members",
 		})
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"members": result,
 		"page":    page,
 		"limit":   limit,
@@ -174,10 +176,5 @@ func (h *AdminHandler) GetMembers(c echo.Context) error {
 }
 
 func hasRole(roles []string, role string) bool {
-	for _, r := range roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(roles, role)
 }

@@ -18,14 +18,15 @@ type Claims struct {
 	DiscordID string   `json:"discord_id"`
 	Username  string   `json:"username"`
 	Email     string   `json:"email"`
+	Avatar    string   `json:"avatar"`
 	Roles     []string `json:"roles"`
 	jwt.RegisteredClaims
 }
 
 // TokenService handles JWT token generation and validation
 type TokenService struct {
-	secretKey []byte
-	issuer    string
+	secretKey      []byte
+	issuer         string
 	expiryDuration time.Duration
 }
 
@@ -39,13 +40,14 @@ func NewTokenService(secretKey string, issuer string, expiryHours int) *TokenSer
 }
 
 // GenerateToken creates a new JWT token for a user
-func (s *TokenService) GenerateToken(userID, discordID, username, email string, roles []string) (string, error) {
+func (s *TokenService) GenerateToken(userID, discordID, username, email, avatar string, roles []string) (string, error) {
 	now := time.Now()
 	claims := Claims{
 		UserID:    userID,
 		DiscordID: discordID,
 		Username:  username,
 		Email:     email,
+		Avatar:    avatar,
 		Roles:     roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
@@ -61,7 +63,7 @@ func (s *TokenService) GenerateToken(userID, discordID, username, email string, 
 
 // ValidateToken validates a JWT token and returns the claims
 func (s *TokenService) ValidateToken(tokenString string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		// Verify signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidToken
@@ -92,5 +94,5 @@ func (s *TokenService) RefreshToken(oldToken string) (string, error) {
 	}
 
 	// Generate new token with same claims but fresh expiry
-	return s.GenerateToken(claims.UserID, claims.DiscordID, claims.Username, claims.Email, claims.Roles)
+	return s.GenerateToken(claims.UserID, claims.DiscordID, claims.Username, claims.Email, claims.Avatar, claims.Roles)
 }

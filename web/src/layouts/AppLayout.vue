@@ -2,56 +2,23 @@
     <v-app>
         <!-- App Bar -->
         <v-app-bar color="surface" elevation="2" app>
-            <v-app-bar-nav-icon @click="drawer = !drawer" />
+            <v-app-bar-nav-icon v-if="isMobile" @click="drawer = !drawer" />
 
             <v-toolbar-title class="text-primary font-weight-bold">
                 Sol Armada
             </v-toolbar-title>
 
             <v-spacer />
-
-            <!-- User Menu -->
-            <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                    <v-btn v-bind="props" icon size="large">
-                        <v-avatar v-if="authStore.user?.avatar" size="32">
-                            <v-img :src="authStore.user.avatar" />
-                        </v-avatar>
-                        <v-icon v-else>mdi-account-circle</v-icon>
-                    </v-btn>
-                </template>
-
-                <v-list>
-                    <v-list-item>
-                        <v-list-item-title class="font-weight-bold">
-                            {{ authStore.user?.username }}
-                        </v-list-item-title>
-                        <v-list-item-subtitle class="text-caption">
-                            {{ authStore.user?.email }}
-                        </v-list-item-subtitle>
-                    </v-list-item>
-
-                    <v-divider />
-
-                    <v-list-item prepend-icon="mdi-account" @click="goToProfile">
-                        <v-list-item-title>Profile</v-list-item-title>
-                    </v-list-item>
-
-                    <v-list-item prepend-icon="mdi-logout" @click="handleLogout">
-                        <v-list-item-title>Logout</v-list-item-title>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
         </v-app-bar>
 
         <!-- Navigation Drawer -->
-        <v-navigation-drawer v-model="drawer" app color="surface">
+        <v-navigation-drawer v-model="drawer" app color="surface" :permanent="!isMobile" :temporary="isMobile">
             <v-list>
                 <!-- Member Section -->
                 <v-list-subheader>MEMBER</v-list-subheader>
 
                 <v-list-item v-for="item in memberItems" :key="item.path" :to="item.path" :prepend-icon="item.icon"
-                    :title="item.title" color="primary" />
+                    :title="item.title" color="primary" :active="isRouteActive(item.path)" />
 
                 <!-- Admin Section (only for admin/moderator) -->
                 <template v-if="authStore.hasAnyRole(['admin', 'moderator'])">
@@ -59,12 +26,19 @@
                     <v-list-subheader>ADMINISTRATION</v-list-subheader>
 
                     <v-list-item v-for="item in adminItems" :key="item.path" :to="item.path" :prepend-icon="item.icon"
-                        :title="item.title" color="secondary"
+                        :title="item.title" color="secondary" :active="isRouteActive(item.path)"
                         :disabled="item.requiresAdmin && !authStore.hasRole('admin')" />
                 </template>
             </v-list>
 
             <template v-slot:append>
+                <v-divider />
+                <div class="pa-2">
+                    <v-btn block variant="text" prepend-icon="mdi-logout" :loading="authStore.loading"
+                        @click="handleLogout">
+                        Logout
+                    </v-btn>
+                </div>
                 <v-divider />
                 <div class="pa-4 text-center text-caption text-medium-emphasis">
                     <p>v1.0.0</p>
@@ -83,13 +57,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useDisplay } from 'vuetify'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const drawer = ref(true)
+const { mobile } = useDisplay()
+const isMobile = computed(() => mobile.value)
+
+watch(isMobile, (value) => {
+    if (!value) {
+        drawer.value = true
+    }
+}, { immediate: true })
 
 const memberItems = computed(() => [
     {
@@ -99,7 +82,7 @@ const memberItems = computed(() => [
     },
     {
         title: 'Profile',
-        icon: 'mdi-account',
+        icon: 'mdi-account-circle',
         path: '/dashboard/profile',
     },
 ])
@@ -115,7 +98,7 @@ const adminItems = computed(() => [
         title: 'Attendance',
         icon: 'mdi-calendar-check',
         path: '/admin/attendance',
-        requiresAdmin: false, // Moderators can access
+        requiresAdmin: false,
     },
     {
         title: 'Token Ledger',
@@ -131,13 +114,13 @@ const adminItems = computed(() => [
     },
 ])
 
-const goToProfile = () => {
-    router.push('/dashboard/profile')
-}
-
 const handleLogout = async () => {
     await authStore.logout()
     router.push('/auth/login')
+}
+
+const isRouteActive = (path: string): boolean => {
+    return router.currentRoute.value.path === path
 }
 </script>
 

@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	"github.com/redis/go-redis/v9"
-	"github.com/sirupsen/logrus"
 )
 
 // RedisClient wraps the Redis client
 type RedisClient struct {
 	Client *redis.Client
-	logger *logrus.Logger
+	logger *slog.Logger
 }
 
 // RedisConfig holds Redis configuration
@@ -23,7 +24,7 @@ type RedisConfig struct {
 }
 
 // NewRedisClient creates a new Redis client
-func NewRedisClient(cfg RedisConfig, logger *logrus.Logger) (*RedisClient, error) {
+func NewRedisClient(cfg RedisConfig, logger *slog.Logger) (*RedisClient, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:         cfg.Addr,
 		Password:     cfg.Password,
@@ -43,7 +44,7 @@ func NewRedisClient(cfg RedisConfig, logger *logrus.Logger) (*RedisClient, error
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	logger.WithField("addr", cfg.Addr).Info("Redis connection established")
+	logger.Info("Redis connection established", "addr", cfg.Addr)
 
 	return &RedisClient{
 		Client: client,

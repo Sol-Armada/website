@@ -3,8 +3,9 @@ package handlers
 import (
 	"net/http"
 
+	"log/slog"
+
 	"github.com/labstack/echo/v4"
-	"github.com/sirupsen/logrus"
 
 	"github.com/sol-armada/website/internal/dto"
 	"github.com/sol-armada/website/internal/service"
@@ -12,10 +13,10 @@ import (
 
 type MemberHandler struct {
 	memberService *service.MemberService
-	logger        *logrus.Logger
+	logger        *slog.Logger
 }
 
-func NewMemberHandler(memberService *service.MemberService, logger *logrus.Logger) *MemberHandler {
+func NewMemberHandler(memberService *service.MemberService, logger *slog.Logger) *MemberHandler {
 	return &MemberHandler{
 		memberService: memberService,
 		logger:        logger,
@@ -33,7 +34,7 @@ func (h *MemberHandler) GetDashboard(c echo.Context) error {
 
 	result, err := h.memberService.GetDashboard(c.Request().Context(), memberID)
 	if err != nil {
-		h.logger.WithError(err).WithField("member_id", memberID).Error("Failed to fetch member dashboard")
+		h.logger.Error("Failed to fetch member dashboard", "error", err, "member_id", memberID)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "member_dashboard_failed",
 			Message: "Failed to fetch member dashboard",
@@ -58,7 +59,7 @@ func (h *MemberHandler) GetProfile(c echo.Context) error {
 
 	result, err := h.memberService.GetProfile(c.Request().Context(), memberID, username, email, roles)
 	if err != nil {
-		h.logger.WithError(err).WithField("member_id", memberID).Error("Failed to fetch member profile")
+		h.logger.Error("Failed to fetch member profile", "error", err, "member_id", memberID)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "member_profile_failed",
 			Message: "Failed to fetch member profile",

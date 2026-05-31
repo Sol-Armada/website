@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	"github.com/redis/go-redis/v9"
-	"github.com/sirupsen/logrus"
 )
 
 // RedisCache wraps Redis operations
 type RedisCache struct {
 	client *redis.Client
-	logger *logrus.Logger
+	logger *slog.Logger
 }
 
 // NewRedisCache creates a new Redis cache
-func NewRedisCache(addr string, logger *logrus.Logger) (*RedisCache, error) {
+func NewRedisCache(addr string, logger *slog.Logger) (*RedisCache, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:            addr,
 		MaxRetries:      3,
@@ -51,7 +52,7 @@ func (rc *RedisCache) Get(ctx context.Context, key string) (string, error) {
 }
 
 // Set stores a value in cache with TTL
-func (rc *RedisCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (rc *RedisCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("json marshal failed: %w", err)
@@ -61,7 +62,7 @@ func (rc *RedisCache) Set(ctx context.Context, key string, value interface{}, tt
 }
 
 // GetJSON retrieves and unmarshals a JSON value from cache
-func (rc *RedisCache) GetJSON(ctx context.Context, key string, result interface{}) error {
+func (rc *RedisCache) GetJSON(ctx context.Context, key string, result any) error {
 	val, err := rc.client.Get(ctx, key).Result()
 	if err != nil {
 		return err

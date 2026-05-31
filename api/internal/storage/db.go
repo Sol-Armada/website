@@ -3,16 +3,16 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sirupsen/logrus"
 )
 
 // DB wraps the PostgreSQL connection pool
 type DB struct {
 	Pool   *pgxpool.Pool
-	logger *logrus.Logger
+	logger *slog.Logger
 }
 
 // Config holds database configuration
@@ -23,7 +23,7 @@ type Config struct {
 }
 
 // NewDB creates a new database connection pool
-func NewDB(ctx context.Context, cfg Config, logger *logrus.Logger) (*DB, error) {
+func NewDB(ctx context.Context, cfg Config, logger *slog.Logger) (*DB, error) {
 	poolConfig, err := pgxpool.ParseConfig(cfg.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database DSN: %w", err)
@@ -47,10 +47,7 @@ func NewDB(ctx context.Context, cfg Config, logger *logrus.Logger) (*DB, error) 
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	logger.WithFields(logrus.Fields{
-		"max_connections": cfg.MaxConnections,
-		"idle_timeout":    cfg.IdleTimeoutSeconds,
-	}).Info("Database connection pool established")
+	logger.With("max_connections", cfg.MaxConnections, "idle_timeout", cfg.IdleTimeoutSeconds).Info("Database connection pool established")
 
 	return &DB{
 		Pool:   pool,

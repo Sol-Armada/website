@@ -1,15 +1,17 @@
 package dto
 
+import "maps"
+
 import "time"
 
 // StandardResponse wraps all API responses
 type StandardResponse struct {
-	Success   bool        `json:"success"`
-	Data      interface{} `json:"data,omitempty"`
-	Error     string      `json:"error,omitempty"`
-	Message   string      `json:"message,omitempty"`
-	Timestamp time.Time   `json:"timestamp"`
-	TraceID   string      `json:"traceId,omitempty"`
+	Success   bool      `json:"success"`
+	Data      any       `json:"data,omitempty"`
+	Error     string    `json:"error,omitempty"`
+	Message   string    `json:"message,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	TraceID   string    `json:"traceId,omitempty"`
 }
 
 // PaginationMeta includes pagination info
@@ -25,20 +27,20 @@ type AppError struct {
 	Code    string
 	Message string
 	Status  int
-	Details map[string]interface{}
+	Details map[string]any
 }
 
 // Common error codes
 const (
-	ErrCodeValidation      = "VALIDATION_ERROR"
-	ErrCodeNotFound        = "NOT_FOUND"
-	ErrCodeUnauthorized    = "UNAUTHORIZED"
-	ErrCodeForbidden       = "FORBIDDEN"
-	ErrCodeConflict        = "CONFLICT"
-	ErrCodeInternal        = "INTERNAL_ERROR"
-	ErrCodeRateLimit       = "RATE_LIMIT_EXCEEDED"
-	ErrCodeUnavailable     = "SERVICE_UNAVAILABLE"
-	ErrCodeDatabaseError   = "DATABASE_ERROR"
+	ErrCodeValidation    = "VALIDATION_ERROR"
+	ErrCodeNotFound      = "NOT_FOUND"
+	ErrCodeUnauthorized  = "UNAUTHORIZED"
+	ErrCodeForbidden     = "FORBIDDEN"
+	ErrCodeConflict      = "CONFLICT"
+	ErrCodeInternal      = "INTERNAL_ERROR"
+	ErrCodeRateLimit     = "RATE_LIMIT_EXCEEDED"
+	ErrCodeUnavailable   = "SERVICE_UNAVAILABLE"
+	ErrCodeDatabaseError = "DATABASE_ERROR"
 )
 
 // NewAppError creates an application error
@@ -47,14 +49,12 @@ func NewAppError(code, message string, status int) *AppError {
 		Code:    code,
 		Message: message,
 		Status:  status,
-		Details: make(map[string]interface{}),
+		Details: make(map[string]any),
 	}
 }
 
 // WithDetails adds contextual details to an error
-func (e *AppError) WithDetails(details map[string]interface{}) *AppError {
-	for k, v := range details {
-		e.Details[k] = v
-	}
+func (e *AppError) WithDetails(details map[string]any) *AppError {
+	maps.Copy(e.Details, details)
 	return e
 }

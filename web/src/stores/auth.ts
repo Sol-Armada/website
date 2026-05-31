@@ -63,9 +63,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = null
 
         try {
-            const loginUrl = await authService.getLoginUrl()
-            // Redirect to Discord OAuth
-            window.location.href = loginUrl
+            authService.login()
         } catch (err: any) {
             error.value = err.message || 'Failed to initiate login'
             loading.value = false

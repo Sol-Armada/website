@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"log/slog"
+
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
-	
+
 	"github.com/sol-armada/website/internal/models"
 	"github.com/sol-armada/website/internal/storage"
 )
@@ -15,13 +16,13 @@ import (
 // SessionService handles session-related business logic
 type SessionService struct {
 	sessionStorage storage.SessionStorage
-	logger         *logrus.Logger
+	logger         *slog.Logger
 }
 
 // NewSessionService creates a new session service
 func NewSessionService(
 	sessionStorage storage.SessionStorage,
-	logger *logrus.Logger,
+	logger *slog.Logger,
 ) *SessionService {
 	return &SessionService{
 		sessionStorage: sessionStorage,
@@ -39,15 +40,15 @@ func (s *SessionService) CreateSession(ctx context.Context, userID, token string
 	}
 	
 	if err := s.sessionStorage.Create(ctx, session); err != nil {
-		s.logger.WithError(err).WithField("user_id", userID).Error("Failed to create session")
+		s.logger.Error("Failed to create session", "error", err, "user_id", userID)
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
-	
-	s.logger.WithFields(logrus.Fields{
-		"user_id":    userID,
-		"session_id": session.ID,
-	}).Info("Session created")
-	
+
+	s.logger.Info("Session created",
+		"user_id", userID,
+		"session_id", session.ID,
+	)
+
 	return session, nil
 }
 
@@ -57,24 +58,25 @@ func (s *SessionService) GetSession(ctx context.Context, sessionID string) (*mod
 }
 
 // DeleteSession deletes a session
+// DeleteSession deletes a session
 func (s *SessionService) DeleteSession(ctx context.Context, sessionID string) error {
 	if err := s.sessionStorage.Delete(ctx, sessionID); err != nil {
-		s.logger.WithError(err).WithField("session_id", sessionID).Error("Failed to delete session")
+		s.logger.Error("Failed to delete session", "error", err, "session_id", sessionID)
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
-	
-	s.logger.WithField("session_id", sessionID).Info("Session deleted")
+
+	s.logger.Info("Session deleted", "session_id", sessionID)
 	return nil
 }
 
 // DeleteUserSessions deletes all sessions for a user (logout all devices)
 func (s *SessionService) DeleteUserSessions(ctx context.Context, userID string) error {
 	if err := s.sessionStorage.DeleteByUserID(ctx, userID); err != nil {
-		s.logger.WithError(err).WithField("user_id", userID).Error("Failed to delete user sessions")
+		s.logger.Error("Failed to delete user sessions", "error", err, "user_id", userID)
 		return fmt.Errorf("failed to delete user sessions: %w", err)
 	}
-	
-	s.logger.WithField("user_id", userID).Info("User sessions deleted")
+
+	s.logger.Info("User sessions deleted", "user_id", userID)
 	return nil
 }
 

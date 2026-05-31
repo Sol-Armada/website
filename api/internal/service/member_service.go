@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"log/slog"
+
 	"github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/tokens"
@@ -41,10 +42,10 @@ type MemberProfileData struct {
 }
 
 type MemberService struct {
-	logger *logrus.Logger
+	logger *slog.Logger
 }
 
-func NewMemberService(logger *logrus.Logger) *MemberService {
+func NewMemberService(logger *slog.Logger) *MemberService {
 	return &MemberService{logger: logger}
 }
 
@@ -73,7 +74,7 @@ func (s *MemberService) GetDashboard(_ context.Context, memberID string) (*Membe
 
 	recentActivity, err := s.getRecentTokenActivity(memberID)
 	if err != nil {
-		s.logger.WithError(err).WithField("member_id", memberID).Warn("Failed to load recent token activity")
+		s.logger.Warn("Failed to load recent token activity", "error", err, "member_id", memberID)
 		recentActivity = []MemberActivity{}
 	}
 
@@ -150,10 +151,7 @@ func (s *MemberService) getRecentTokenActivity(memberID string) ([]MemberActivit
 		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
 	})
 
-	limit := 5
-	if len(filtered) < limit {
-		limit = len(filtered)
-	}
+	limit := min(len(filtered), 5)
 
 	result := make([]MemberActivity, 0, limit)
 	for i := 0; i < limit; i++ {
