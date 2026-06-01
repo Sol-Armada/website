@@ -4,7 +4,8 @@
 
 <template>
   <div aria-hidden="true" class="mesh-bg" />
-  <main class="main-bg min-h-screen p-4 flex items-center">
+
+  <main class="main-bg min-h-screen">
     <router-view />
   </main>
 </template>

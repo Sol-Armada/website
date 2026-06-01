@@ -19,6 +19,7 @@ type AdminServiceInterface interface {
 	GetOverviewStats(context.Context) (*service.AdminOverviewStats, error)
 	GetAttendanceRecords(context.Context, int, int) ([]service.AttendanceRecord, error)
 	GetTokenLedger(context.Context, int, int) ([]service.TokenTransaction, error)
+	GetTokenLedgerAnalytics(context.Context) (*service.TokenLedgerAnalytics, error)
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 }
 
@@ -132,6 +133,27 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 		"page":    page,
 		"limit":   limit,
 	})
+}
+
+func (h *AdminHandler) GetTokenLedgerAnalytics(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	result, err := h.adminService.GetTokenLedgerAnalytics(c.Request().Context())
+	if err != nil {
+		h.logger.Error("Failed to fetch token ledger analytics", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "token_analytics_failed",
+			Message: "Failed to fetch token ledger analytics",
+		})
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
 
 func (h *AdminHandler) GetMembers(c echo.Context) error {

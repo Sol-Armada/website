@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"log/slog"
@@ -13,17 +14,17 @@ import (
 )
 
 type AdminOverviewStats struct {
-	TotalMembers       int `json:"totalMembers"`
-	TotalEvents        int `json:"totalEvents"`
-	TotalTokens        int `json:"totalTokens"`
-	ActiveThisMonth    int `json:"activeThisMonth"`
-	UniqueAttendees    int `json:"uniqueAttendees"`
-	AverageAttendance  int `json:"averageAttendance"`
+	TotalMembers      int `json:"totalMembers"`
+	TotalEvents       int `json:"totalEvents"`
+	TotalTokens       int `json:"totalTokens"`
+	ActiveThisMonth   int `json:"activeThisMonth"`
+	UniqueAttendees   int `json:"uniqueAttendees"`
+	AverageAttendance int `json:"averageAttendance"`
 }
 
 type AttendanceRecord struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
 	SubmittedBy      string    `json:"submittedBy"`
 	ParticipantCount int       `json:"participantCount"`
 	Recorded         bool      `json:"recorded"`
@@ -32,14 +33,44 @@ type AttendanceRecord struct {
 }
 
 type TokenTransaction struct {
-	ID              string    `json:"id"`
-	MemberID        string    `json:"memberId"`
-	Amount          int       `json:"amount"`
-	Reason          string    `json:"reason"`
-	CreatedAt       time.Time `json:"createdAt"`
-	Comment         string    `json:"comment,omitempty"`
-	GiverID         string    `json:"giverId,omitempty"`
-	AttendanceID    string    `json:"attendanceId,omitempty"`
+	ID           string    `json:"id"`
+	MemberID     string    `json:"memberId"`
+	Amount       int       `json:"amount"`
+	Reason       string    `json:"reason"`
+	CreatedAt    time.Time `json:"createdAt"`
+	Comment      string    `json:"comment,omitempty"`
+	GiverID      string    `json:"giverId,omitempty"`
+	AttendanceID string    `json:"attendanceId,omitempty"`
+}
+
+type TokenPeriodAnalytics struct {
+	WindowStart                   time.Time `json:"windowStart"`
+	WindowEnd                     time.Time `json:"windowEnd"`
+	TotalEarnings                 int       `json:"totalEarnings"`
+	TotalSpending                 int       `json:"totalSpending"`
+	NetAmount                     int       `json:"netAmount"`
+	AverageEarningPerMember       float64   `json:"averageEarningPerMember"`
+	AverageSpendingPerMember      float64   `json:"averageSpendingPerMember"`
+	AverageEarningPerTransaction  float64   `json:"averageEarningPerTransaction"`
+	AverageSpendingPerTransaction float64   `json:"averageSpendingPerTransaction"`
+	EarningTransactionCount       int       `json:"earningTransactionCount"`
+	SpendingTransactionCount      int       `json:"spendingTransactionCount"`
+	EarningMemberCount            int       `json:"earningMemberCount"`
+	SpendingMemberCount           int       `json:"spendingMemberCount"`
+}
+
+type TokenReasonAggregation struct {
+	Reason           string `json:"reason"`
+	TransactionCount int    `json:"transactionCount"`
+	NetAmount        int    `json:"netAmount"`
+	TotalEarnings    int    `json:"totalEarnings"`
+	TotalSpending    int    `json:"totalSpending"`
+}
+
+type TokenLedgerAnalytics struct {
+	Week    TokenPeriodAnalytics     `json:"week"`
+	Month   TokenPeriodAnalytics     `json:"month"`
+	Reasons []TokenReasonAggregation `json:"reasons"`
 }
 
 type MemberSummary struct {
@@ -139,13 +170,13 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int) 
 		}
 
 		result = append(result, AttendanceRecord{
-			ID:              att.Id,
-			Name:            att.Name,
-			SubmittedBy:     submittedBy,
+			ID:               att.Id,
+			Name:             att.Name,
+			SubmittedBy:      submittedBy,
 			ParticipantCount: participantCount,
-			Recorded:        att.Recorded,
-			Successful:      att.Successful,
-			DateCreated:     att.DateCreated,
+			Recorded:         att.Recorded,
+			Successful:       att.Successful,
+			DateCreated:      att.DateCreated,
 		})
 	}
 
@@ -155,6 +186,9 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int) 
 func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int) ([]TokenTransaction, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
+	}
+	if page < 1 {
+		page = 1
 	}
 
 	allTokens, err := tokens.GetAll()
@@ -206,6 +240,115 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int) ([]Tok
 	}
 
 	return result, nil
+}
+
+func (s *AdminService) GetTokenLedgerAnalytics(_ context.Context) (*TokenLedgerAnalytics, error) {
+	allTokens, err := tokens.GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token records for analytics: %w", err)
+	}
+
+	now := time.Now().UTC()
+	weekStart := now.AddDate(0, 0, -7)
+	monthStart := now.AddDate(0, 0, -30)
+
+	return &TokenLedgerAnalytics{
+		Week:    calculateTokenPeriodAnalytics(allTokens, weekStart, now),
+		Month:   calculateTokenPeriodAnalytics(allTokens, monthStart, now),
+		Reasons: calculateReasonAggregation(allTokens),
+	}, nil
+}
+
+func calculateTokenPeriodAnalytics(allTokens []tokens.TokenRecord, start, end time.Time) TokenPeriodAnalytics {
+	result := TokenPeriodAnalytics{
+		WindowStart: start,
+		WindowEnd:   end,
+	}
+
+	earningMembers := make(map[string]struct{})
+	spendingMembers := make(map[string]struct{})
+
+	for _, token := range allTokens {
+		createdAt := token.CreatedAt.UTC()
+		if createdAt.Before(start) || createdAt.After(end) {
+			continue
+		}
+
+		result.NetAmount += token.Amount
+
+		if token.Amount > 0 {
+			result.TotalEarnings += token.Amount
+			result.EarningTransactionCount += 1
+			earningMembers[token.MemberId] = struct{}{}
+			continue
+		}
+
+		if token.Amount < 0 {
+			result.TotalSpending += -token.Amount
+			result.SpendingTransactionCount += 1
+			spendingMembers[token.MemberId] = struct{}{}
+		}
+	}
+
+	result.EarningMemberCount = len(earningMembers)
+	result.SpendingMemberCount = len(spendingMembers)
+
+	if result.EarningMemberCount > 0 {
+		result.AverageEarningPerMember = float64(result.TotalEarnings) / float64(result.EarningMemberCount)
+	}
+
+	if result.SpendingMemberCount > 0 {
+		result.AverageSpendingPerMember = float64(result.TotalSpending) / float64(result.SpendingMemberCount)
+	}
+
+	if result.EarningTransactionCount > 0 {
+		result.AverageEarningPerTransaction = float64(result.TotalEarnings) / float64(result.EarningTransactionCount)
+	}
+
+	if result.SpendingTransactionCount > 0 {
+		result.AverageSpendingPerTransaction = float64(result.TotalSpending) / float64(result.SpendingTransactionCount)
+	}
+
+	return result
+}
+
+func calculateReasonAggregation(allTokens []tokens.TokenRecord) []TokenReasonAggregation {
+	totals := make(map[string]*TokenReasonAggregation)
+
+	for _, token := range allTokens {
+		reason := string(token.Reason)
+		entry, exists := totals[reason]
+		if !exists {
+			entry = &TokenReasonAggregation{Reason: reason}
+			totals[reason] = entry
+		}
+
+		entry.TransactionCount += 1
+		entry.NetAmount += token.Amount
+
+		if token.Amount > 0 {
+			entry.TotalEarnings += token.Amount
+		} else if token.Amount < 0 {
+			entry.TotalSpending += -token.Amount
+		}
+	}
+
+	result := make([]TokenReasonAggregation, 0, len(totals))
+	for _, entry := range totals {
+		result = append(result, *entry)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].TransactionCount == result[j].TransactionCount {
+			if result[i].NetAmount == result[j].NetAmount {
+				return result[i].Reason < result[j].Reason
+			}
+			return result[i].NetAmount > result[j].NetAmount
+		}
+		return result[i].TransactionCount > result[j].TransactionCount
+	})
+
+	return result
 }
 
 func (s *AdminService) GetMembers(_ context.Context, limit, page int, search string) ([]MemberSummary, error) {

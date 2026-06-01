@@ -1,9 +1,9 @@
-import UnoCSS from 'unocss/vite';
-import VueRouter from 'vue-router/vite';
 import { fileURLToPath, URL } from 'node:url'
 import Vue from '@vitejs/plugin-vue'
+import UnoCSS from 'unocss/vite'
 import Fonts from 'unplugin-fonts/vite'
 import { defineConfig } from 'vite'
+import VueRouter from 'vue-router/vite'
 
 export default defineConfig({
   plugins: [VueRouter({ dts: 'src/typed-router.d.ts' }), Vue(), Fonts({
@@ -25,5 +25,16 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: {
+      '/auth': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 })

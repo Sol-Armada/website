@@ -113,8 +113,9 @@ func (ck CacheKey) String() string {
 
 // Common cache key prefixes
 const (
-	KeyMemberStats    = "member:stats"
-	KeyAttendanceList = "attendance:list"
-	KeyTokenBalance   = "token:balance"
-	KeyAdminOverview  = "admin:overview"
+	KeyMemberStats         = "member:stats"
+	KeyAttendanceList      = "attendance:list"
+	KeyTokenBalance        = "token:balance"
+	KeyAdminOverview       = "admin:overview"
+	KeyAdminTokenAnalytics = "admin:token-analytics"
 )

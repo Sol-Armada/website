@@ -30,9 +30,11 @@
         src="https://cdn.vuetifyjs.com/docs/images/one/logos/vzero.svg"
         width="92"
       >
+
       <h1 class="text-4xl font-bold text-on-background mb-3">
         Vuetify0
       </h1>
+
       <p class="text-on-background opacity-60">
         Headless components for Vue 3
       </p>
@@ -49,6 +51,7 @@
         >
           {{ link.label }}<span class="sr-only"> (opens in new tab)</span>
         </a>
+
         <span v-if="index < links.length - 1" class="text-on-surface opacity-30">•</span>
       </template>
     </div>

@@ -28,6 +28,7 @@ import (
 	"github.com/sol-armada/website/internal/database"
 	"github.com/sol-armada/website/internal/handlers"
 	appMiddleware "github.com/sol-armada/website/internal/middleware"
+	"github.com/sol-armada/website/internal/realtime"
 	"github.com/sol-armada/website/internal/service"
 	"github.com/sol-armada/website/internal/storage"
 )
@@ -168,6 +169,9 @@ func main() {
 	)
 	memberHandler := handlers.NewMemberHandler(memberService, log)
 	adminHandler := handlers.NewAdminHandler(adminServiceInterface, log)
+	wsHub := realtime.NewHub(log)
+	go wsHub.RunHealthHeartbeat(20 * time.Second)
+	wsHandler := handlers.NewWebSocketHandler(wsHub, log)
 
 	// Setup Echo router
 	e := echo.New()
@@ -224,7 +228,9 @@ func main() {
 	adminAPI.GET("/overview", adminHandler.GetOverview)
 	adminAPI.GET("/attendance", adminHandler.GetAttendance)
 	adminAPI.GET("/token-ledger", adminHandler.GetTokenLedger)
+	adminAPI.GET("/token-ledger/analytics", adminHandler.GetTokenLedgerAnalytics)
 	adminAPI.GET("/members", adminHandler.GetMembers)
+	api.GET("/ws", wsHandler.Handle)
 
 	// Start server in a goroutine
 	go func() {
@@ -240,6 +246,7 @@ func main() {
 	<-sigChan
 
 	log.Info("Shutting down server")
+	wsHub.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

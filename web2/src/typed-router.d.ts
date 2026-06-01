@@ -38,6 +38,62 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/attendance': RouteRecordInfo<
+      '/admin/attendance',
+      '/admin/attendance',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/members': RouteRecordInfo<
+      '/admin/members',
+      '/admin/members',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/overview': RouteRecordInfo<
+      '/admin/overview',
+      '/admin/overview',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/token-ledger': RouteRecordInfo<
+      '/admin/token-ledger',
+      '/admin/token-ledger',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/auth/callback': RouteRecordInfo<
+      '/auth/callback',
+      '/auth/callback',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/auth/login': RouteRecordInfo<
+      '/auth/login',
+      '/auth/login',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/dashboard/': RouteRecordInfo<
+      '/dashboard/',
+      '/dashboard',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/dashboard/profile': RouteRecordInfo<
+      '/dashboard/profile',
+      '/dashboard/profile',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -54,6 +110,70 @@ declare module 'vue-router/auto-routes' {
     'src/pages/index.vue': {
       routes:
         | '/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/admin/attendance.vue': {
+      routes:
+        | '/admin/attendance'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/admin/members.vue': {
+      routes:
+        | '/admin/members'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/admin/overview.vue': {
+      routes:
+        | '/admin/overview'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/admin/token-ledger.vue': {
+      routes:
+        | '/admin/token-ledger'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/auth/callback.vue': {
+      routes:
+        | '/auth/callback'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/auth/login.vue': {
+      routes:
+        | '/auth/login'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/dashboard/index.vue': {
+      routes:
+        | '/dashboard/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/dashboard/profile.vue': {
+      routes:
+        | '/dashboard/profile'
       views:
         | never
       pathParamNames:
