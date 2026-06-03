@@ -11,13 +11,13 @@
   const error = ref<string | null>(null)
   const dashboard = ref<MemberDashboardData | null>(null)
 
-  onMounted(async () => {
+  onMounted(async() => {
     loading.value = true
     error.value = null
 
     try {
       dashboard.value = await memberService.getDashboard()
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to load dashboard data'
     } finally {
       loading.value = false

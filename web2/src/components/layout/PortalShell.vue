@@ -54,21 +54,21 @@
     })
   })
 
-  function isRouteActive (path: string): boolean {
+  function isRouteActive(path: string): boolean {
     return route.path === path
   }
 
-  function onNavigate () {
+  function onNavigate() {
     mobileOpen.value = false
   }
 
-  async function handleLogout () {
+  async function handleLogout() {
     await authStore.logout()
     mobileOpen.value = false
     router.push('/auth/login')
   }
 
-  function buildTopics (): string[] {
+  function buildTopics(): string[] {
     const topics = [WS_TOPIC_SYSTEM_HEALTH]
     if (authStore.hasRole('admin')) {
       topics.push(

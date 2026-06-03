@@ -5,7 +5,7 @@
 
   const authStore = useAuthStore()
 
-  async function startLogin () {
+  async function startLogin() {
     await authStore.login()
   }
 </script>

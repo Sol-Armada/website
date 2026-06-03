@@ -14,20 +14,20 @@
   let refreshTimer: number | null = null
   const unsubscribers: Array<() => void> = []
 
-  async function loadOverview () {
+  async function loadOverview() {
     loading.value = true
     error.value = null
 
     try {
       overview.value = await adminService.getOverview()
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to load admin overview'
     } finally {
       loading.value = false
     }
   }
 
-  function scheduleRefresh () {
+  function scheduleRefresh() {
     if (refreshTimer !== null) {
       window.clearTimeout(refreshTimer)
     }
@@ -37,7 +37,7 @@
     }, 400)
   }
 
-  onMounted(async () => {
+  onMounted(async() => {
     await loadOverview()
 
     unsubscribers.push(

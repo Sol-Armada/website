@@ -30,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
     return roles.some(role => hasRole(role))
   }
 
-  const checkAuth = async (): Promise<boolean> => {
+  const checkAuth = async(): Promise<boolean> => {
     loading.value = true
     error.value = null
 
@@ -38,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
       const sessionUser = await authService.checkAuth()
       user.value = sessionUser
       return sessionUser !== null
-    } catch (error_: any) {
+    } catch(error_: any) {
       user.value = null
       error.value = error_?.message || 'Failed to check authentication'
       return false
@@ -47,19 +47,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const login = async (): Promise<void> => {
+  const login = async(): Promise<void> => {
     loading.value = true
     error.value = null
 
     try {
       authService.login()
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to start login flow'
       loading.value = false
     }
   }
 
-  const logout = async (): Promise<void> => {
+  const logout = async(): Promise<void> => {
     loading.value = true
     error.value = null
 
@@ -67,20 +67,20 @@ export const useAuthStore = defineStore('auth', () => {
       await authService.logout()
       wsClient.disconnect()
       user.value = null
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to log out'
     } finally {
       loading.value = false
     }
   }
 
-  const fetchUser = async (): Promise<void> => {
+  const fetchUser = async(): Promise<void> => {
     loading.value = true
     error.value = null
 
     try {
       user.value = await authService.me()
-    } catch (error_: any) {
+    } catch(error_: any) {
       user.value = null
       error.value = error_?.message || 'Failed to fetch user'
       throw error_

@@ -1,6 +1,7 @@
 # Binary output
 bin/
 /bin/
+dist/
 
 # Go build cache
 .cache/

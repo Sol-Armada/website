@@ -11,13 +11,13 @@
   const error = ref<string | null>(null)
   const profile = ref<MemberProfileData | null>(null)
 
-  onMounted(async () => {
+  onMounted(async() => {
     loading.value = true
     error.value = null
 
     try {
       profile.value = await memberService.getProfile()
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to load profile data'
     } finally {
       loading.value = false

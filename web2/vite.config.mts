@@ -17,6 +17,10 @@ export default defineConfig({
       ],
     },
   }), UnoCSS()],
+  build: {
+    outDir: '../api/dist',
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),

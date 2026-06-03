@@ -10,7 +10,7 @@
   const authStore = useAuthStore()
   const callbackError = ref<string | null>(null)
 
-  onMounted(async () => {
+  onMounted(async() => {
     const queryError = route.query.error
     if (typeof queryError === 'string' && queryError.length > 0) {
       const queryMessage = route.query.message
