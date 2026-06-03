@@ -18,27 +18,40 @@ jobs:
                 include:
                     - goos: linux
                       goarch: amd64
-                      artifact: website-api-linux-amd64
+                      artifact: website-linux-amd64
                     - goos: linux
                       goarch: arm64
-                      artifact: website-api-linux-arm64
+                      artifact: website-linux-arm64
 
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: web2/.nvmrc
+
+            - name: Install frontend dependencies
+              working-directory: web2
+              run: yarn install --frozen-lockfile
+
+            - name: Build frontend
+              working-directory: web2
+              run: yarn build
 
             - name: Setup Go
               uses: actions/setup-go@v5
               with:
                   go-version-file: api/go.mod
 
-            - name: Build binary
+            - name: Build binary with embedded frontend
               run: |
                   CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
                     go build \
                     -ldflags "-X main.version=${GITHUB_REF_NAME} -X main.hash=${GITHUB_SHA::7}" \
                     -o ${{ matrix.artifact }} \
-                    ./api/cmd/server
+                    ./api
 
             - name: Generate checksum
               run: sha256sum ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
@@ -61,14 +74,14 @@ jobs:
               uses: actions/download-artifact@v4
               with:
                   path: dist
-                  pattern: website-api-linux-*
+                  pattern: website-linux-*
                   merge-multiple: true
 
             - name: Publish release files
               uses: softprops/action-gh-release@v2
               with:
                   files: |
-                      dist/website-api-linux-amd64
-                      dist/website-api-linux-amd64.sha256
-                      dist/website-api-linux-arm64
-                      dist/website-api-linux-arm64.sha256
+                      dist/website-linux-amd64
+                      dist/website-linux-amd64.sha256
+                      dist/website-linux-arm64
+                      dist/website-linux-arm64.sha256
