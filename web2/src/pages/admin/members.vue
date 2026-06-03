@@ -1,10 +1,11 @@
 <script setup lang="ts">
-  import { onMounted, onUnmounted, ref, watch } from 'vue'
+  import { onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
   import { adminService, type MemberSummary } from '@/services/adminService'
+  import { WS_TOPIC_ADMIN_MEMBERS, wsClient } from '@/services/wsClient'
 
   const loading = ref(true)
   const error = ref<string | null>(null)
@@ -15,8 +16,20 @@
   const hasNextPage = ref(false)
 
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  let refreshTimer: number | null = null
+  const unsubscribers: Array<() => void> = []
 
-  async function loadMembers (): Promise<void> {
+  function scheduleRefresh() {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+    }
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null
+      void loadMembers()
+    }, 400)
+  }
+
+  async function loadMembers(): Promise<void> {
     loading.value = true
     error.value = null
 
@@ -24,7 +37,7 @@
       const response = await adminService.getMembers(limit.value, page.value, search.value || undefined)
       members.value = response.members || []
       hasNextPage.value = members.value.length === limit.value
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to load members'
       hasNextPage.value = false
     } finally {
@@ -32,13 +45,13 @@
     }
   }
 
-  function goToPreviousPage (): void {
+  function goToPreviousPage(): void {
     if (page.value <= 1 || loading.value) return
 
     page.value -= 1
   }
 
-  function goToNextPage (): void {
+  function goToNextPage(): void {
     if (!hasNextPage.value || loading.value) return
 
     page.value += 1
@@ -57,8 +70,19 @@
     }, 300)
   })
 
-  onMounted(async () => {
+  onMounted(async() => {
     await loadMembers()
+    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, scheduleRefresh))
+  })
+
+  onBeforeUnmount(() => {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe()
+    }
   })
 
   onUnmounted(() => {

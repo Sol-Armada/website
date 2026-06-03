@@ -1,10 +1,11 @@
 <script setup lang="ts">
-  import { onMounted, ref, watch } from 'vue'
+  import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
   import { adminService, type AttendanceRecord } from '@/services/adminService'
+  import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
 
   const loading = ref(true)
   const error = ref<string | null>(null)
@@ -12,8 +13,20 @@
   const page = ref(1)
   const limit = ref(25)
   const hasNextPage = ref(false)
+  let refreshTimer: number | null = null
+  const unsubscribers: Array<() => void> = []
 
-  async function loadAttendance (): Promise<void> {
+  function scheduleRefresh() {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+    }
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null
+      void loadAttendance()
+    }, 400)
+  }
+
+  async function loadAttendance(): Promise<void> {
     loading.value = true
     error.value = null
 
@@ -21,7 +34,7 @@
       const response = await adminService.getAttendance(limit.value, page.value)
       records.value = response.records || []
       hasNextPage.value = records.value.length === limit.value
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to load attendance records'
       hasNextPage.value = false
     } finally {
@@ -29,13 +42,13 @@
     }
   }
 
-  function goToPreviousPage (): void {
+  function goToPreviousPage(): void {
     if (page.value <= 1 || loading.value) return
 
     page.value -= 1
   }
 
-  function goToNextPage (): void {
+  function goToNextPage(): void {
     if (!hasNextPage.value || loading.value) return
 
     page.value += 1
@@ -45,8 +58,19 @@
     void loadAttendance()
   })
 
-  onMounted(async () => {
+  onMounted(async() => {
     await loadAttendance()
+    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
+  })
+
+  onBeforeUnmount(() => {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe()
+    }
   })
 </script>
 

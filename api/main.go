@@ -5,4 +5,3 @@ package main
 func main() {
 	panic("Use cmd/server/main.go - run with: go run ./cmd/server")
 }
-

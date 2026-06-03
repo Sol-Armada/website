@@ -37,11 +37,11 @@ func (s *CookieService) SetSessionCookie(c echo.Context, token string, maxAge in
 		Secure:   s.isProduction,
 		SameSite: http.SameSiteLaxMode,
 	}
-	
+
 	if s.domain != "" {
 		cookie.Domain = s.domain
 	}
-	
+
 	c.SetCookie(cookie)
 }
 
@@ -56,11 +56,11 @@ func (s *CookieService) SetCSRFCookie(c echo.Context, token string, maxAge int) 
 		Secure:   s.isProduction,
 		SameSite: http.SameSiteStrictMode,
 	}
-	
+
 	if s.domain != "" {
 		cookie.Domain = s.domain
 	}
-	
+
 	c.SetCookie(cookie)
 }
 
@@ -75,7 +75,7 @@ func (s *CookieService) ClearSessionCookie(c echo.Context) {
 		Secure:   s.isProduction,
 		SameSite: http.SameSiteLaxMode,
 	}
-	
+
 	c.SetCookie(cookie)
 }
 
@@ -90,7 +90,7 @@ func (s *CookieService) ClearCSRFCookie(c echo.Context) {
 		Secure:   s.isProduction,
 		SameSite: http.SameSiteStrictMode,
 	}
-	
+
 	c.SetCookie(cookie)
 }
 

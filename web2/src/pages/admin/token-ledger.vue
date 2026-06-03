@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { onMounted, ref, watch } from 'vue'
+  import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
@@ -11,6 +11,7 @@
     type TokenPeriodAnalytics,
     type TokenTransaction,
   } from '@/services/adminService'
+  import { WS_TOPIC_ADMIN_TOKEN_LEDGER, wsClient } from '@/services/wsClient'
 
   const loading = ref(true)
   const error = ref<string | null>(null)
@@ -22,28 +23,40 @@
   const analyticsLoading = ref(true)
   const analyticsError = ref<string | null>(null)
   const analytics = ref<TokenLedgerAnalytics | null>(null)
+  let refreshTimer: number | null = null
+  const unsubscribers: Array<() => void> = []
 
-  function formatTokenAmount (value: number): string {
+  function scheduleRefresh() {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+    }
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null
+      void Promise.all([loadTokenLedger(), loadAnalytics()])
+    }, 400)
+  }
+
+  function formatTokenAmount(value: number): string {
     return `${value >= 0 ? '+' : '-'}${Math.abs(value)}`
   }
 
-  function formatAverage (value: number): string {
+  function formatAverage(value: number): string {
     return value.toFixed(2)
   }
 
-  function formatPeriodLabel (period: TokenPeriodAnalytics): string {
+  function formatPeriodLabel(period: TokenPeriodAnalytics): string {
     const start = new Date(period.windowStart).toLocaleDateString()
     const end = new Date(period.windowEnd).toLocaleDateString()
     return `${start} - ${end}`
   }
 
-  async function loadAnalytics (): Promise<void> {
+  async function loadAnalytics(): Promise<void> {
     analyticsLoading.value = true
     analyticsError.value = null
 
     try {
       analytics.value = await adminService.getTokenLedgerAnalytics()
-    } catch (error_: any) {
+    } catch(error_: any) {
       analyticsError.value = error_?.message || 'Failed to load analytics'
       analytics.value = null
     } finally {
@@ -51,7 +64,7 @@
     }
   }
 
-  async function loadTokenLedger (): Promise<void> {
+  async function loadTokenLedger(): Promise<void> {
     loading.value = true
     error.value = null
 
@@ -59,7 +72,7 @@
       const response = await adminService.getTokenLedger(limit.value, page.value)
       transactions.value = response.records || []
       hasNextPage.value = transactions.value.length === limit.value
-    } catch (error_: any) {
+    } catch(error_: any) {
       error.value = error_?.message || 'Failed to load token ledger'
       hasNextPage.value = false
     } finally {
@@ -67,13 +80,13 @@
     }
   }
 
-  function goToPreviousPage (): void {
+  function goToPreviousPage(): void {
     if (page.value <= 1 || loading.value) return
 
     page.value -= 1
   }
 
-  function goToNextPage (): void {
+  function goToNextPage(): void {
     if (!hasNextPage.value || loading.value) return
 
     page.value += 1
@@ -83,8 +96,19 @@
     void loadTokenLedger()
   })
 
-  onMounted(async () => {
+  onMounted(async() => {
     await Promise.all([loadTokenLedger(), loadAnalytics()])
+    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_TOKEN_LEDGER, scheduleRefresh))
+  })
+
+  onBeforeUnmount(() => {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe()
+    }
   })
 </script>
 

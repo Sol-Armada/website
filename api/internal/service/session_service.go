@@ -38,7 +38,7 @@ func (s *SessionService) CreateSession(ctx context.Context, userID, token string
 		Token:     token,
 		ExpiresAt: time.Now().Add(time.Duration(expiryHours) * time.Hour),
 	}
-	
+
 	if err := s.sessionStorage.Create(ctx, session); err != nil {
 		s.logger.Error("Failed to create session", "error", err, "user_id", userID)
 		return nil, fmt.Errorf("failed to create session: %w", err)
@@ -88,4 +88,3 @@ func (s *SessionService) GetUserSessions(ctx context.Context, userID string) ([]
 	}
 	return sessions, nil
 }
-

@@ -2,8 +2,8 @@ package dto
 
 // AuthResponse is returned after successful authentication
 type AuthResponse struct {
-	User  UserDTO `json:"user"`
-	CSRF  string  `json:"csrf_token"`
+	User UserDTO `json:"user"`
+	CSRF string  `json:"csrf_token"`
 }
 
 // UserDTO represents user data for API responses
@@ -28,11 +28,11 @@ type DiscordUser struct {
 
 // DiscordGuild represents guild data from Discord API
 type DiscordGuild struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Icon        string   `json:"icon"`
-	Owner       bool     `json:"owner"`
-	Permissions string   `json:"permissions"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Owner       bool   `json:"owner"`
+	Permissions string `json:"permissions"`
 }
 
 // DiscordGuildMember represents guild member data from Discord API
