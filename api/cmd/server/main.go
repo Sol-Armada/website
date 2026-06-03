@@ -19,6 +19,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sol-armada/sol-bot/attendance"
 	solbotdb "github.com/sol-armada/sol-bot/database"
+	"github.com/sol-armada/sol-bot/database/dbnotify"
 	solbotpg "github.com/sol-armada/sol-bot/database/postgresql"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/tokens"
@@ -173,6 +174,46 @@ func main() {
 	go wsHub.RunHealthHeartbeat(20 * time.Second)
 	wsHandler := handlers.NewWebSocketHandler(wsHub, log)
 
+	notifyListener, err := dbnotify.NewListener(dbnotify.ListenerConfig{
+		DSN: cfg.Database.DSN,
+		Channels: []string{
+			dbnotify.ChannelMembers,
+			dbnotify.ChannelAttendance,
+			dbnotify.ChannelTokens,
+		},
+		OnError: func(listenerErr error) {
+			log.Warn("db notify listener warning", "error", listenerErr)
+		},
+	})
+	if err != nil {
+		log.Error("Failed to initialize db notify listener", "error", err)
+		os.Exit(1)
+	}
+
+	notifyCtx, cancelNotify := context.WithCancel(context.Background())
+	go func() {
+		if runErr := notifyListener.Run(notifyCtx, func(_ context.Context, event dbnotify.Event) error {
+			topic, ok := realtime.TopicForNotifyChannel(event.Channel)
+			if !ok {
+				return nil
+			}
+
+			wsHub.Publish(topic, map[string]any{
+				"channel":         event.Channel,
+				"operation":       event.Operation,
+				"schema":          event.Schema,
+				"table":           event.Table,
+				"primary_key":     event.PrimaryKey,
+				"occurred_at":     event.OccurredAt,
+				"changed_columns": event.ChangedColumns,
+			})
+
+			return nil
+		}); runErr != nil {
+			log.Warn("db notify listener stopped", "error", runErr)
+		}
+	}()
+
 	// Setup Echo router
 	e := echo.New()
 	e.HideBanner = true
@@ -246,6 +287,7 @@ func main() {
 	<-sigChan
 
 	log.Info("Shutting down server")
+	cancelNotify()
 	wsHub.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
