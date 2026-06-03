@@ -30,14 +30,14 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version-file: web2/.nvmrc
+                  node-version-file: web/.nvmrc
 
             - name: Install frontend dependencies
-              working-directory: web2
+              working-directory: web
               run: yarn install --frozen-lockfile
 
             - name: Build frontend
-              working-directory: web2
+              working-directory: web
               run: yarn build
 
             - name: Setup Go
