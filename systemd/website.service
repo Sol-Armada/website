@@ -1,0 +1,42 @@
+[Unit]
+Description=Sol Armada Website
+After=network.target network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+WorkingDirectory=/var/lib/website
+ExecStart=/opt/website
+User=website
+Group=website
+
+# Environment configuration
+EnvironmentFile=-/etc/website/website.env
+
+# Clean shutdown
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=60
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/website /etc/website /opt/website
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+
+# Logging: JSON output to stdout, captured by journald
+StandardOutput=journal
+StandardError=journal
+
+# Environment defaults
+Environment="APP_ENV=production"
+
+[Install]
+WantedBy=multi-user.target

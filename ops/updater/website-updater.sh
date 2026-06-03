@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_OWNER="Sol-Armada"
+REPO_NAME="website"
+ARCH="amd64"
+APP_NAME="website"
+SERVICE_NAME="website"
+INSTALL_PATH="/opt/website"
+RELEASES_DIR="/opt/website-releases"
+STATE_DIR="/var/lib/website"
+
+LOCK_FILE="/var/lock/${APP_NAME}-updater.lock"
+TMP_DIR="$(mktemp -d)"
+VERSION_FILE="${STATE_DIR}/current-version"
+
+cleanup() {
+  rm -rf "${TMP_DIR}"
+}
+trap cleanup EXIT
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+require_cmd curl
+require_cmd jq
+require_cmd sha256sum
+require_cmd systemctl
+require_cmd flock
+
+log_service_failure_details() {
+  local service="$1"
+
+  echo "--- ${service} status (systemctl) ---" >&2
+  systemctl status --no-pager --full "${service}" >&2 || true
+
+  if command -v journalctl >/dev/null 2>&1; then
+    echo "--- ${service} recent logs (journalctl -n 80) ---" >&2
+    journalctl -u "${service}" -n 80 --no-pager >&2 || true
+  fi
+}
+
+mkdir -p "${RELEASES_DIR}" "${STATE_DIR}" /var/lock
+
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  echo "update already running"
+  exit 0
+fi
+
+API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
+AUTH_HEADERS=()
+
+release_json="$(curl -fsSL "${AUTH_HEADERS[@]}" -H "Accept: application/vnd.github+json" "${API_URL}")"
+latest_tag="$(printf '%s' "${release_json}" | jq -r '.tag_name')"
+
+if [[ -z "${latest_tag}" || "${latest_tag}" == "null" ]]; then
+  echo "failed to determine latest release tag" >&2
+  exit 1
+fi
+
+current_tag=""
+if [[ -f "${VERSION_FILE}" ]]; then
+  current_tag="$(cat "${VERSION_FILE}")"
+fi
+
+if [[ "${current_tag}" == "${latest_tag}" ]]; then
+  echo "already up to date (${latest_tag})"
+  exit 0
+fi
+
+echo "downloading ${APP_NAME} release ${latest_tag} for ${ARCH}"
+
+asset_name="${APP_NAME}-linux-${ARCH}"
+asset_url="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${latest_tag}/${asset_name}"
+checksum_url="${asset_url}.sha256"
+
+curl -fsSL "${AUTH_HEADERS[@]}" -o "${TMP_DIR}/${asset_name}" "${asset_url}"
+curl -fsSL "${AUTH_HEADERS[@]}" -o "${TMP_DIR}/${asset_name}.sha256" "${checksum_url}"
+
+(
+  cd "${TMP_DIR}"
+  sha256sum -c "${asset_name}.sha256"
+)
+
+echo "downloaded and verified ${APP_NAME} release ${latest_tag}"
+echo "installing ${APP_NAME} release ${latest_tag}"
+
+release_dir="${RELEASES_DIR}/${latest_tag}"
+install -d -m 755 "${release_dir}"
+install -m 755 "${TMP_DIR}/${asset_name}" "${release_dir}/${APP_NAME}"
+
+echo "restarting ${SERVICE_NAME} service"
+
+previous_release=""
+if [[ -f "${VERSION_FILE}" ]]; then
+  previous_release="$(cat "${VERSION_FILE}")"
+fi
+
+install -m 755 "${release_dir}/${APP_NAME}" "${INSTALL_PATH}"
+
+if ! systemctl restart "${SERVICE_NAME}"; then
+  echo "service restart failed for ${SERVICE_NAME}, attempting rollback" >&2
+  log_service_failure_details "${SERVICE_NAME}"
+  if [[ -n "${previous_release}" && -x "${RELEASES_DIR}/${previous_release}/${APP_NAME}" ]]; then
+    install -m 755 "${RELEASES_DIR}/${previous_release}/${APP_NAME}" "${INSTALL_PATH}"
+    if ! systemctl restart "${SERVICE_NAME}"; then
+      echo "rollback restart also failed for ${SERVICE_NAME}" >&2
+      log_service_failure_details "${SERVICE_NAME}"
+    fi
+  fi
+  exit 1
+fi
+
+echo "waiting for ${SERVICE_NAME} to become active"
+
+sleep 8
+if ! systemctl is-active --quiet "${SERVICE_NAME}"; then
+  echo "health check failed after update for ${SERVICE_NAME}, attempting rollback" >&2
+  log_service_failure_details "${SERVICE_NAME}"
+  if [[ -n "${previous_release}" && -x "${RELEASES_DIR}/${previous_release}/${APP_NAME}" ]]; then
+    install -m 755 "${RELEASES_DIR}/${previous_release}/${APP_NAME}" "${INSTALL_PATH}"
+    if ! systemctl restart "${SERVICE_NAME}"; then
+      echo "rollback restart also failed for ${SERVICE_NAME}" >&2
+      log_service_failure_details "${SERVICE_NAME}"
+    fi
+  fi
+  exit 1
+fi
+
+echo "${latest_tag}" > "${VERSION_FILE}"
+
+# Keep only the three newest release directories.
+mapfile -t old_dirs < <(ls -1dt "${RELEASES_DIR}"/v* 2>/dev/null | tail -n +4 || true)
+if [[ "${#old_dirs[@]}" -gt 0 ]]; then
+  rm -rf "${old_dirs[@]}"
+fi
+
+echo "updated ${APP_NAME} to ${latest_tag}"
