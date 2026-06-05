@@ -1,87 +1,88 @@
 name: Release Binary
 
 on:
-    push:
-        tags:
-            - "v*.*.*"
+  push:
+    tags:
+      - "v*.*.*"
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-    build:
-        name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
-        runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - goos: linux
-                      goarch: amd64
-                      artifact: website-linux-amd64
-                    - goos: linux
-                      goarch: arm64
-                      artifact: website-linux-arm64
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            artifact: website-linux-amd64
+          - goos: linux
+            goarch: arm64
+            artifact: website-linux-arm64
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version-file: web/.nvmrc
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
 
-            - name: Install frontend dependencies
-              working-directory: web
-              run: yarn install --frozen-lockfile
+      - name: Install frontend dependencies
+        working-directory: web
+        run: yarn install --frozen-lockfile
 
-            - name: Build frontend
-              working-directory: web
-              run: yarn build
+      - name: Build frontend
+        working-directory: web
+        run: yarn build
 
-            - name: Setup Go
-              uses: actions/setup-go@v5
-              with:
-                  go-version-file: api/go.mod
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
 
-            - name: Build binary with embedded frontend
-              run: |
-                  CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-                    go build \
-                    -ldflags "-X main.version=${GITHUB_REF_NAME} -X main.hash=${GITHUB_SHA::7}" \
-                    -o ${{ matrix.artifact }} \
-                    ./api
+      - name: Build binary with embedded frontend
+        run: |
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build \
+            -ldflags "-X main.version=${GITHUB_REF_NAME} -X main.hash=${GITHUB_SHA::7}" \
+            -o ${{ matrix.artifact }} \
+            ./api
 
-            - name: Generate checksum
-              run: sha256sum ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
+      - name: Generate checksum
+        run: sha256sum ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
 
-            - name: Upload build artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ${{ matrix.artifact }}
-                  path: |
-                      ${{ matrix.artifact }}
-                      ${{ matrix.artifact }}.sha256
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}
+            ${{ matrix.artifact }}.sha256
 
-    release:
-        name: Publish Release Assets
-        runs-on: ubuntu-latest
-        needs: build
+  release:
+    name: Publish Release Assets
+    runs-on: ubuntu-latest
+    needs: build
 
-        steps:
-            - name: Download build artifacts
-              uses: actions/download-artifact@v4
-              with:
-                  path: dist
-                  pattern: website-linux-*
-                  merge-multiple: true
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: website-linux-*
+          merge-multiple: true
 
-            - name: Publish release files
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: |
-                      dist/website-linux-amd64
-                      dist/website-linux-amd64.sha256
-                      dist/website-linux-arm64
-                      dist/website-linux-arm64.sha256
+      - name: Publish release files
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/website-linux-amd64
+            dist/website-linux-amd64.sha256
+            dist/website-linux-arm64
+            dist/website-linux-arm64.sha256

@@ -12,7 +12,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 go build \
 	-ldflags "-X main.version=${VERSION} -X main.hash=${COMMIT}" \
-	-o ./dist/website-api ./api/cmd/server
+	-o ./dist/website-api ./api
 
 FROM alpine:latest
 
