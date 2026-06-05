@@ -21,9 +21,9 @@ func OptimizePool(pool *pgxpool.Pool, logger *slog.Logger) {
 	// Log pool stats
 	stats := pool.Stat()
 	logger.Info("Connection pool stats",
-		"conns_acquired", stats.AcquiredConns,
-		"conns_idle", stats.IdleConns,
-		"conns_total", stats.TotalConns,
+		"conns_acquired", stats.AcquiredConns(),
+		"conns_idle", stats.IdleConns(),
+		"conns_total", stats.TotalConns(),
 	)
 }
 
