@@ -1,4 +1,5 @@
 name: Release Binary
+run-name: Building release binaries for ${{ github.ref_name }}
 
 on:
   release:
