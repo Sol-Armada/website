@@ -5,6 +5,12 @@ export const WS_TOPIC_ADMIN_MEMBERS = 'admin.members.updated'
 export const WS_TOPIC_ADMIN_ATTENDANCE = 'admin.attendance.updated'
 export const WS_TOPIC_ADMIN_TOKEN_LEDGER = 'admin.token_ledger.updated'
 
+const WS_BASE_URL = trimTrailingSlash(import.meta.env.VITE_WS_BASE_URL || '')
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
 export interface RealtimeEnvelope {
   type: string
   topic: string
@@ -154,6 +160,10 @@ class WebSocketClient {
   }
 
   private buildWebSocketUrl(): string {
+    if (WS_BASE_URL) {
+      return `${WS_BASE_URL}/api/ws`
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${protocol}//${window.location.host}/api/ws`
   }

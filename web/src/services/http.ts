@@ -3,6 +3,24 @@ export interface ErrorResponse {
   message?: string
 }
 
+const API_BASE_URL = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '')
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function withBaseUrl(path: string): string {
+  if (!API_BASE_URL || /^https?:\/\//.test(path)) {
+    return path
+  }
+
+  if (path.startsWith('/')) {
+    return `${API_BASE_URL}${path}`
+  }
+
+  return `${API_BASE_URL}/${path}`
+}
+
 async function readErrorMessage(response: Response): Promise<string> {
   try {
     const payload = await response.json() as ErrorResponse
@@ -13,8 +31,10 @@ async function readErrorMessage(response: Response): Promise<string> {
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
+  const urlPath = withBaseUrl(path)
+
   if (!params) {
-    return path
+    return urlPath
   }
 
   const query = new URLSearchParams()
@@ -27,10 +47,10 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
 
   const serialized = query.toString()
   if (!serialized) {
-    return path
+    return urlPath
   }
 
-  return `${path}?${serialized}`
+  return `${urlPath}?${serialized}`
 }
 
 export async function requestJson<T>(

@@ -58,11 +58,11 @@ func main() {
 	}
 
 	var handler slog.Handler
-	handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+	handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: logLevel,
 	})
-	if cfg.Logging.CLI {
-		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	if cfg.Logging.HUMAN {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level: logLevel,
 		})
 	}

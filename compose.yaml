@@ -3,7 +3,7 @@ services:
     image: ghcr.io/sol-armada/website:latest
     container_name: website-api
     env_file:
-      - ./api/.env.production
+      - ./website.env
     ports:
       - "8080:8080"
     depends_on:

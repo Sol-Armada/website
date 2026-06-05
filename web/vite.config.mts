@@ -6,6 +6,7 @@ import { defineConfig } from 'vite'
 import VueRouter from 'vue-router/vite'
 
 export default defineConfig({
+  envDir: '..',
   plugins: [VueRouter({ dts: 'src/typed-router.d.ts' }), Vue(), Fonts({
     fontsource: {
       families: [

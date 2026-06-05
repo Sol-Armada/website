@@ -19,7 +19,7 @@ type Config struct {
 
 type LoggingConfig struct {
 	Level string
-	CLI   bool
+	HUMAN bool
 }
 
 type DatabaseConfig struct {
@@ -62,7 +62,7 @@ func load() (Config, error) {
 	cfg := Config{
 		Logging: LoggingConfig{
 			Level: getEnv("LOG_LEVEL", "info"),
-			CLI:   getEnvBool("LOG_CLI", false),
+			HUMAN: getEnvBool("LOG_HUMAN", false),
 		},
 		Database: DatabaseConfig{
 			DSN:            getEnv("DATABASE_DSN", "postgres://localhost/website"),

@@ -5,6 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+EnvironmentFile=-/etc/website/website.env
 EnvironmentFile=-/etc/website/updater.env
 ExecStart=/usr/local/bin/website-updater.sh
 StandardOutput=journal
