@@ -46,12 +46,13 @@ jobs:
           cache-dependency-path: api/go.sum
 
       - name: Build binary with embedded frontend
+        working-directory: api
         run: |
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
             go build \
             -ldflags "-X main.version=${GITHUB_REF_NAME} -X main.hash=${GITHUB_SHA::7}" \
-            -o ${{ matrix.artifact }} \
-            ./api
+            -o ../${{ matrix.artifact }} \
+            .
 
       - name: Generate checksum
         run: sha256sum ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
