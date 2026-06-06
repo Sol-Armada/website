@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"embed"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -21,8 +22,14 @@ type StaticHandler struct {
 
 // NewStaticHandler creates a new static file handler for embedded frontend assets
 func NewStaticHandler(embeddedFS embed.FS, log *slog.Logger) *StaticHandler {
+	frontendRoot, err := fs.Sub(embeddedFS, "dist")
+	if err != nil {
+		log.Error("failed to mount embedded frontend dist", "error", err)
+		return &StaticHandler{log: log}
+	}
+
 	return &StaticHandler{
-		fs:  embeddedFS,
+		fs:  frontendRoot,
 		log: log,
 	}
 }
@@ -93,7 +100,7 @@ func (h *StaticHandler) serveFile(c echo.Context, filePath string) error {
 
 	// Set headers
 	c.Response().Header().Set("Content-Type", contentType)
-	c.Response().Header().Set("Content-Length", string(rune(fileInfo.Size())))
+	c.Response().Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
 
 	// Set cache headers for assets vs HTML
 	if strings.HasPrefix(filePath, "assets/") {
