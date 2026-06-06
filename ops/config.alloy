@@ -1,0 +1,102 @@
+loki.process "sol_armada_portal" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.json {
+		expressions = {
+			output_message = "message",
+		}
+	}
+
+	stage.json {
+		expressions = {
+			extract_level = "level",
+		}
+		source = "output_message"
+	}
+
+	stage.template {
+		source   = "extract_level"
+		template = "{{ ToLower .Value }}"
+	}
+
+	stage.labels {
+		values = {
+			level = "extract_level",
+		}
+	}
+}
+
+discovery.relabel "sol_armada_portal" {
+	targets = []
+
+	rule {
+		source_labels = ["__journal_syslog_hostname"]
+		target_label  = "instance"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		target_label  = "syslog_identifier"
+	}
+
+	rule {
+		source_labels = ["__journal_systemd_unit"]
+		target_label  = "unit"
+	}
+
+	rule {
+		target_label = "environment"
+		replacement  = "prod"
+	}
+}
+
+loki.source.journal "sol_armada_portal" {
+	path          = "/var/log/journal"
+	relabel_rules = discovery.relabel.sol_armada_portal.rules
+	forward_to    = [loki.process.sol_armada_portal.receiver]
+	labels        = {
+		job     = "sol-armada-portal",
+		service = "website",
+	}
+}
+
+discovery.relabel "sol_armada_portal_updater" {
+	targets = []
+
+	rule {
+		source_labels = ["__journal_syslog_hostname"]
+		target_label  = "instance"
+	}
+
+	rule {
+		source_labels = ["__journal_syslog_identifier"]
+		target_label  = "syslog_identifier"
+	}
+
+	rule {
+		source_labels = ["__journal_systemd_unit"]
+		target_label  = "unit"
+	}
+
+	rule {
+		target_label = "environment"
+		replacement  = "prod"
+	}
+}
+
+loki.source.journal "sol_armada_portal_updater" {
+	path          = "/var/log/journal"
+	relabel_rules = discovery.relabel.sol_armada_portal_updater.rules
+	forward_to    = [loki.write.default.receiver]
+	labels        = {
+		job     = "sol-armada-portal-updater",
+		service = "website-updater",
+	}
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki.server.local:3100/loki/api/v1/push"
+	}
+	external_labels = {}
+}
