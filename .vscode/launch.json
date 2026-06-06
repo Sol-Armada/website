@@ -10,8 +10,8 @@
             "request": "launch",
             "mode": "auto",
             "cwd": "${workspaceFolder}/api",
-            "program": "${workspaceFolder}/api/cmd/server",
-            "envFile": "${workspaceFolder}/api/.env"
+            "program": "${workspaceFolder}/api/",
+            "envFile": "${workspaceFolder}/.env.development"
         }
     ]
 }
