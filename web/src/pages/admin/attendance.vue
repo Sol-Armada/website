@@ -1,98 +1,87 @@
 <script setup lang="ts">
-  import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-  import PortalShell from '@/components/layout/PortalShell.vue'
-  import DataPanel from '@/components/ui/DataPanel.vue'
-  import PageHeader from '@/components/ui/PageHeader.vue'
-  import StatePanel from '@/components/ui/StatePanel.vue'
-  import { adminService, type AttendanceRecord } from '@/services/adminService'
-  import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import PortalShell from '@/components/layout/PortalShell.vue'
+import DataPanel from '@/components/ui/DataPanel.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import StatePanel from '@/components/ui/StatePanel.vue'
+import { adminService, type AttendanceRecord } from '@/services/adminService'
+import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
 
-  const loading = ref(true)
-  const error = ref<string | null>(null)
-  const records = ref<AttendanceRecord[]>([])
-  const page = ref(1)
-  const limit = ref(25)
-  const hasNextPage = ref(false)
-  let refreshTimer: number | null = null
-  const unsubscribers: Array<() => void> = []
+const loading = ref(true)
+const error = ref<string | null>(null)
+const records = ref<AttendanceRecord[]>([])
+const page = ref(1)
+const limit = ref(25)
+const hasNextPage = ref(false)
+let refreshTimer: number | null = null
+const unsubscribers: Array<() => void> = []
 
-  function scheduleRefresh() {
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-    }
-    refreshTimer = window.setTimeout(() => {
-      refreshTimer = null
-      void loadAttendance()
-    }, 400)
+function scheduleRefresh() {
+  if (refreshTimer !== null) {
+    window.clearTimeout(refreshTimer)
   }
-
-  async function loadAttendance(): Promise<void> {
-    loading.value = true
-    error.value = null
-
-    try {
-      const response = await adminService.getAttendance(limit.value, page.value)
-      records.value = response.records || []
-      hasNextPage.value = records.value.length === limit.value
-    } catch(error_: any) {
-      error.value = error_?.message || 'Failed to load attendance records'
-      hasNextPage.value = false
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function goToPreviousPage(): void {
-    if (page.value <= 1 || loading.value) return
-
-    page.value -= 1
-  }
-
-  function goToNextPage(): void {
-    if (!hasNextPage.value || loading.value) return
-
-    page.value += 1
-  }
-
-  watch(page, () => {
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null
     void loadAttendance()
-  })
+  }, 400)
+}
 
-  onMounted(async() => {
-    await loadAttendance()
-    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
-  })
+async function loadAttendance(): Promise<void> {
+  loading.value = true
+  error.value = null
 
-  onBeforeUnmount(() => {
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-      refreshTimer = null
-    }
-    for (const unsubscribe of unsubscribers) {
-      unsubscribe()
-    }
-  })
+  try {
+    const response = await adminService.getAttendance(limit.value, page.value)
+    records.value = response.records || []
+    hasNextPage.value = records.value.length === limit.value
+  } catch (error_: any) {
+    error.value = error_?.message || 'Failed to load attendance records'
+    hasNextPage.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
+function goToPreviousPage(): void {
+  if (page.value <= 1 || loading.value) return
+
+  page.value -= 1
+}
+
+function goToNextPage(): void {
+  if (!hasNextPage.value || loading.value) return
+
+  page.value += 1
+}
+
+watch(page, () => {
+  void loadAttendance()
+})
+
+onMounted(async () => {
+  await loadAttendance()
+  unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
+})
+
+onBeforeUnmount(() => {
+  if (refreshTimer !== null) {
+    window.clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
+  for (const unsubscribe of unsubscribers) {
+    unsubscribe()
+  }
+})
 </script>
 
 <template>
   <PortalShell>
-    <PageHeader
-      subtitle="Attendance records list with simple paging controls."
-      title="Attendance"
-    />
+    <PageHeader subtitle="Attendance records list with simple paging controls." title="Attendance" />
 
-    <DataPanel
-      description="Review attendance records and page through history."
-      title="Attendance Records"
-    >
+    <DataPanel description="Review attendance records and page through history." title="Attendance Records">
       <StatePanel v-if="loading" message="Loading attendance records..." title="Please wait" />
 
-      <StatePanel
-        v-else-if="error"
-        :message="error"
-        title="Attendance load failed"
-        tone="error"
-      />
+      <StatePanel v-else-if="error" :message="error" title="Attendance load failed" tone="error" />
 
       <div v-else-if="records.length > 0" class="overflow-x-auto rounded-lg border border-subtle">
         <table class="w-full text-left text-sm text-on-surface">
@@ -124,19 +113,13 @@
         <div class="flex items-center gap-2">
           <button
             class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="loading || page === 1"
-            type="button"
-            @click="goToPreviousPage"
-          >
+            :disabled="loading || page === 1" type="button" @click="goToPreviousPage">
             Previous
           </button>
 
           <button
             class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="loading || !hasNextPage"
-            type="button"
-            @click="goToNextPage"
-          >
+            :disabled="loading || !hasNextPage" type="button" @click="goToNextPage">
             Next
           </button>
         </div>
