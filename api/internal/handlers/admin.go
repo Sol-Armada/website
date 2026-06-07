@@ -23,6 +23,8 @@ type AdminServiceInterface interface {
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 }
 
+var _ AdminServiceInterface = (*service.AdminService)(nil)
+
 type AdminHandler struct {
 	adminService AdminServiceInterface
 	logger       *slog.Logger

@@ -5,7 +5,7 @@
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
   import { adminService, type MemberSummary } from '@/services/adminService'
-  import { WS_TOPIC_ADMIN_MEMBERS, wsClient } from '@/services/wsClient'
+  import { type RealtimeEnvelope, WS_TOPIC_ADMIN_MEMBERS, wsClient } from '@/services/wsClient'
 
   const loading = ref(true)
   const isRefreshing = ref(false)
@@ -13,6 +13,7 @@
   const members = ref<MemberSummary[]>([])
   const search = ref('')
   const page = ref(1)
+  const pageInput = ref('1')
   const limit = ref(25)
   const hasNextPage = ref(false)
 
@@ -20,9 +21,14 @@
   let refreshTimer: number | null = null
   let inFlightRequest: Promise<void> | null = null
   let queuedRefreshMode: 'background' | 'blocking' | null = null
+  let nextPageLoadMode: 'background' | 'blocking' = 'blocking'
   const unsubscribers: Array<() => void> = []
 
   function scheduleRefresh() {
+    if (search.value.trim() !== '') {
+      return
+    }
+
     if (refreshTimer !== null) {
       window.clearTimeout(refreshTimer)
     }
@@ -30,6 +36,71 @@
       refreshTimer = null
       void loadMembers({ background: true })
     }, 400)
+  }
+
+  function logRealtimeMemberDecision(decision: string, event: RealtimeEnvelope): void {
+    if (!import.meta.env.DEV) {
+      return
+    }
+
+    const operation = String(event.payload?.operation ?? '').toLowerCase()
+    const memberID = String(event.payload?.member_id ?? event.payload?.primary_key ?? '').trim()
+    console.debug('[members:realtime]', {
+      decision,
+      operation,
+      memberID,
+      page: page.value,
+      pageSize: limit.value,
+      visibleRows: members.value.length,
+      searchActive: search.value.trim() !== '',
+      sequence: event.sequence,
+    })
+  }
+
+  function applyRealtimeMemberEvent(event: RealtimeEnvelope): void {
+    if (search.value.trim() !== '') {
+      logRealtimeMemberDecision('ignored-search-active', event)
+      return
+    }
+
+    const operation = String(event.payload?.operation ?? '').toLowerCase()
+    const memberID = String(event.payload?.member_id ?? event.payload?.primary_key ?? '').trim()
+    const payloadMember = event.payload?.member as MemberSummary | undefined
+
+    if (operation === 'delete' && memberID !== '') {
+      const nextMembers = members.value.filter(member => member.id !== memberID)
+      if (nextMembers.length !== members.value.length) {
+        members.value = nextMembers
+        logRealtimeMemberDecision('patched-delete', event)
+        return
+      }
+      logRealtimeMemberDecision('ignored-delete-not-visible', event)
+      return
+    }
+
+    if (!payloadMember || !payloadMember.id) {
+      logRealtimeMemberDecision('fallback-refresh-missing-member-payload', event)
+      scheduleRefresh()
+      return
+    }
+
+    const existingIndex = members.value.findIndex(member => member.id === payloadMember.id)
+    if (existingIndex !== -1) {
+      const nextMembers = [...members.value]
+      nextMembers[existingIndex] = payloadMember
+      members.value = nextMembers
+      logRealtimeMemberDecision('patched-update-visible-row', event)
+      return
+    }
+
+    if (operation === 'insert' && page.value === 1 && members.value.length < limit.value) {
+      members.value = [payloadMember, ...members.value]
+      logRealtimeMemberDecision('patched-insert-page-1', event)
+      return
+    }
+
+    logRealtimeMemberDecision('fallback-refresh-not-visible', event)
+    scheduleRefresh()
   }
 
   async function loadMembers(options: { background?: boolean } = {}): Promise<void> {
@@ -87,6 +158,28 @@
     page.value -= 1
   }
 
+  function goToFirstPage(): void {
+    if (page.value === 1 || loading.value) return
+
+    page.value = 1
+  }
+
+  function jumpToPage(): void {
+    if (loading.value) return
+
+    const nextPage = Number.parseInt(pageInput.value, 10)
+    if (!Number.isFinite(nextPage) || nextPage < 1) {
+      pageInput.value = String(page.value)
+      return
+    }
+
+    if (nextPage === page.value) {
+      return
+    }
+
+    page.value = nextPage
+  }
+
   function goToNextPage(): void {
     if (!hasNextPage.value || loading.value) return
 
@@ -94,21 +187,30 @@
   }
 
   watch(page, () => {
-    void loadMembers()
+    pageInput.value = String(page.value)
+    const shouldUseBackgroundLoad = nextPageLoadMode === 'background'
+    nextPageLoadMode = 'blocking'
+    void loadMembers({ background: shouldUseBackgroundLoad })
   })
 
   watch(search, () => {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
 
     searchDebounceTimer = setTimeout(() => {
-      page.value = 1
+      nextPageLoadMode = 'background'
+
+      if (page.value !== 1) {
+        page.value = 1
+        return
+      }
+
       void loadMembers({ background: true })
     }, 300)
   })
 
   onMounted(async() => {
     await loadMembers()
-    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, scheduleRefresh))
+    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, applyRealtimeMemberEvent))
   })
 
   onBeforeUnmount(() => {
@@ -133,21 +235,14 @@
     <DataPanel description="Browse members with search and paging controls." title="Member Directory">
       <input
         v-model="search"
-        class="mb-3 w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+        class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface mb-2"
         placeholder="Search members..."
         type="search"
       >
 
-      <p
-        v-if="isRefreshing && !loading"
-        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant"
-      >
-        Refreshing data...
-      </p>
+      <br>
 
-      <StatePanel v-if="loading" message="Loading members..." title="Please wait" />
-
-      <StatePanel v-else-if="error" :message="error" title="Members load failed" tone="error" />
+      <StatePanel v-if="error" :message="error" title="Members load failed" tone="error" />
 
       <div v-else-if="members.length > 0" class="overflow-x-auto rounded-lg border border-subtle">
         <table class="w-full text-left text-sm text-on-surface">
@@ -181,9 +276,35 @@
             class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="loading || page === 1"
             type="button"
+            @click="goToFirstPage"
+          >
+            First
+          </button>
+
+          <button
+            class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="loading || page === 1"
+            type="button"
             @click="goToPreviousPage"
           >
             Previous
+          </button>
+
+          <input
+            v-model="pageInput"
+            class="w-20 rounded-md border border-subtle bg-transparent px-2 py-1.5 text-right text-sm text-on-surface"
+            min="1"
+            type="number"
+            @keydown.enter.prevent="jumpToPage"
+          >
+
+          <button
+            class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="loading"
+            type="button"
+            @click="jumpToPage"
+          >
+            Go
           </button>
 
           <button

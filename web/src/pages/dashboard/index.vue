@@ -27,7 +27,7 @@
 
 <template>
   <PortalShell>
-    <PageHeader subtitle="Skeleton surface for attendance, tokens, rank, and activity data." title="Member Dashboard" />
+    <PageHeader subtitle="" title="Member Dashboard" />
 
     <StatePanel v-if="loading" message="Loading dashboard..." title="Please wait" />
 
@@ -35,13 +35,13 @@
 
     <template v-else-if="dashboard">
       <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard detail="Events attended" label="Attendance" :value="dashboard.attendance" />
-        <StatCard detail="Current token balance" label="Tokens" :value="dashboard.tokens" />
-        <StatCard detail="Current member rank" label="Rank" :value="dashboard.rank" />
+        <StatCard detail="" label="Attendance" :value="dashboard.attendance" />
+        <StatCard detail="" label="Tokens" :value="dashboard.tokens" />
+        <StatCard detail="" label="Rank" :value="dashboard.rank" />
       </section>
 
       <section class="mt-6 grid gap-4 lg:grid-cols-2">
-        <DataPanel description="Latest member timeline entries from backend." title="Recent Activity">
+        <DataPanel description="" title="Recent Activity">
           <ul v-if="dashboard.recentActivity.length > 0" class="space-y-2 text-sm text-on-surface-variant">
             <li
               v-for="activity in dashboard.recentActivity"

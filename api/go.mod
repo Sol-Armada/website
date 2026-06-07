@@ -2,6 +2,8 @@ module github.com/sol-armada/website
 
 go 1.26.3
 
+replace github.com/sol-armada/sol-bot v1.14.14 => ../../sol-bot
+
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
@@ -9,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/redis/go-redis/v9 v9.20.0
-	github.com/sol-armada/sol-bot v1.14.5
+	github.com/sol-armada/sol-bot v1.14.14
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/time v0.15.0
 )

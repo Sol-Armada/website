@@ -19,6 +19,7 @@
   const transactions = ref<TokenTransaction[]>([])
   const ledgerSearch = ref('')
   const page = ref(1)
+  const pageInput = ref('1')
   const limit = ref(25)
   const hasNextPage = ref(false)
 
@@ -40,6 +41,11 @@
     }
     refreshTimer = window.setTimeout(() => {
       refreshTimer = null
+      if (ledgerSearch.value.trim() !== '') {
+        void loadAnalytics({ background: true })
+        return
+      }
+
       void Promise.all([
         loadTokenLedger({ background: true }),
         loadAnalytics({ background: true }),
@@ -163,6 +169,28 @@
     page.value -= 1
   }
 
+  function goToFirstPage(): void {
+    if (page.value === 1 || loading.value) return
+
+    page.value = 1
+  }
+
+  function jumpToPage(): void {
+    if (loading.value) return
+
+    const nextPage = Number.parseInt(pageInput.value, 10)
+    if (!Number.isFinite(nextPage) || nextPage < 1) {
+      pageInput.value = String(page.value)
+      return
+    }
+
+    if (nextPage === page.value) {
+      return
+    }
+
+    page.value = nextPage
+  }
+
   function goToNextPage(): void {
     if (!hasNextPage.value || loading.value) return
 
@@ -170,6 +198,7 @@
   }
 
   watch(page, () => {
+    pageInput.value = String(page.value)
     void loadTokenLedger()
   })
 
@@ -312,17 +341,17 @@
     <DataPanel description="Review credit and debit transactions across pages." title="Ledger Entries">
       <input
         v-model="ledgerSearch"
-        class="mb-3 w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+        class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
         placeholder="Search ledger entries..."
         type="search"
       >
 
-      <p
-        v-if="isRefreshing && !loading"
-        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant"
-      >
-        Refreshing data...
-      </p>
+      <div class="mb-3 mt-2 h-0.5 w-full overflow-hidden rounded-full bg-surface-variant/40">
+        <div
+          class="h-full w-full bg-primary/80 transition-opacity duration-150"
+          :class="isRefreshing && !loading ? 'animate-pulse opacity-100' : 'opacity-0'"
+        />
+      </div>
 
       <StatePanel v-if="loading" message="Loading token ledger..." title="Please wait" />
 
@@ -366,9 +395,35 @@
             class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
             :disabled="loading || page === 1"
             type="button"
+            @click="goToFirstPage"
+          >
+            First
+          </button>
+
+          <button
+            class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="loading || page === 1"
+            type="button"
             @click="goToPreviousPage"
           >
             Previous
+          </button>
+
+          <input
+            v-model="pageInput"
+            class="w-20 rounded-md border border-subtle bg-transparent px-2 py-1.5 text-right text-sm text-on-surface"
+            min="1"
+            type="number"
+            @keydown.enter.prevent="jumpToPage"
+          >
+
+          <button
+            class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="loading"
+            type="button"
+            @click="jumpToPage"
+          >
+            Go
           </button>
 
           <button

@@ -202,7 +202,7 @@ func main() {
 				return nil
 			}
 
-			wsHub.Publish(topic, map[string]any{
+			payload := map[string]any{
 				"channel":         event.Channel,
 				"operation":       event.Operation,
 				"schema":          event.Schema,
@@ -210,7 +210,26 @@ func main() {
 				"primary_key":     event.PrimaryKey,
 				"occurred_at":     event.OccurredAt,
 				"changed_columns": event.ChangedColumns,
-			})
+			}
+
+			if topic == realtime.TopicAdminMembers {
+				memberID := extractPrimaryKeyID(event.PrimaryKey)
+				if memberID != "" {
+					payload["member_id"] = memberID
+				}
+
+				operation := strings.ToLower(event.Operation)
+				if operation != "delete" && memberID != "" {
+					memberSummary, memberErr := adminService.GetMemberSummaryByID(notifyCtx, memberID)
+					if memberErr != nil {
+						log.Debug("failed to enrich member ws payload", "member_id", memberID, "error", memberErr)
+					} else if memberSummary != nil {
+						payload["member"] = memberSummary
+					}
+				}
+			}
+
+			wsHub.Publish(topic, payload)
 
 			return nil
 		}); runErr != nil {
@@ -306,6 +325,24 @@ func main() {
 	}
 
 	log.Info("Server stopped")
+}
+
+func extractPrimaryKeyID(primaryKey map[string]any) string {
+	if len(primaryKey) == 0 {
+		return ""
+	}
+
+	if idValue, ok := primaryKey["id"]; ok && idValue != nil {
+		return fmt.Sprint(idValue)
+	}
+
+	for _, value := range primaryKey {
+		if value != nil {
+			return fmt.Sprint(value)
+		}
+	}
+
+	return ""
 }
 
 func toSolBotPostgresConfig(dsn string, maxConns int) (solbotdb.PostgresConfig, error) {

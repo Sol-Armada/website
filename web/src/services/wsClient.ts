@@ -149,6 +149,18 @@ class WebSocketClient {
   }
 
   private dispatch(message: RealtimeEnvelope) {
+    if (import.meta.env.DEV) {
+      const operation = message.payload?.operation
+      // Debug trace for identifying which WS events drive UI refresh behavior.
+      console.debug('[ws:event]', {
+        type: message.type,
+        topic: message.topic,
+        operation,
+        sequence: message.sequence,
+        payload: message.payload,
+      })
+    }
+
     const handlers = this.handlers.get(message.topic)
     if (!handlers) {
       return

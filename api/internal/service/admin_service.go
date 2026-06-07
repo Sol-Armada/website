@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -386,15 +387,21 @@ func calculateReasonAggregation(allTokens []tokens.TokenRecord) []TokenReasonAgg
 	return result
 }
 
-func (s *AdminService) GetMembers(_ context.Context, limit, page int, search string) ([]MemberSummary, error) {
+func (s *AdminService) GetMembers(ctx context.Context, limit, page int, search string) ([]MemberSummary, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	if page < 1 {
-		page = 1
-	}
 
-	memberList, err := members.List(page)
+	var memberList []members.Member
+	var err error
+	switch {
+	case page == 0 || search != "":
+		memberList, err = members.ListAll(ctx)
+	case page > 0:
+		memberList, err = members.List(ctx, page, limit)
+	default:
+		return nil, fmt.Errorf("invalid page number: %d", page)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch members: %w", err)
 	}
@@ -407,10 +414,7 @@ func (s *AdminService) GetMembers(_ context.Context, limit, page int, search str
 	}
 
 	// Build balance map
-	balances := make(map[string]int)
-	for _, t := range allTokens {
-		balances[t.MemberId] += t.Amount
-	}
+	balances := buildTokenBalanceMap(allTokens)
 
 	normalizedSearch := normalizeSearch(search)
 
@@ -420,37 +424,22 @@ func (s *AdminService) GetMembers(_ context.Context, limit, page int, search str
 			continue
 		}
 
-		attendance, err := attendance.GetMemberAttendanceCount(m.Id)
-		if err != nil {
-			attendance = 0
-		}
-
-		rsiHandle := ""
-		if m.RsiInfo != nil {
-			rsiHandle = m.RsiInfo.Handle
-		}
+		summary := buildMemberSummary(m, balances)
 
 		if normalizedSearch != "" {
 			if !matchesAnyField(normalizedSearch,
-				m.Name,
-				m.Id,
-				m.Rank.String(),
-				rsiHandle,
-				strconv.Itoa(attendance),
-				strconv.Itoa(balances[m.Id]),
+				summary.Username,
+				summary.ID,
+				summary.Rank,
+				summary.RSIHandle,
+				strconv.Itoa(summary.Attendance),
+				strconv.Itoa(summary.TokenBalance),
 			) {
 				continue
 			}
 		}
 
-		result = append(result, MemberSummary{
-			ID:           m.Id,
-			Username:     m.Name,
-			Rank:         m.Rank.String(),
-			Attendance:   attendance,
-			TokenBalance: balances[m.Id],
-			RSIHandle:    rsiHandle,
-		})
+		result = append(result, summary)
 
 		if len(result) >= limit {
 			break
@@ -458,6 +447,62 @@ func (s *AdminService) GetMembers(_ context.Context, limit, page int, search str
 	}
 
 	return result, nil
+}
+
+func (s *AdminService) GetMemberSummaryByID(_ context.Context, memberID string) (*MemberSummary, error) {
+	if strings.TrimSpace(memberID) == "" {
+		return nil, nil
+	}
+
+	member, err := members.Get(memberID)
+	if err != nil {
+		if errors.Is(err, members.MemberNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to fetch member %s: %w", memberID, err)
+	}
+
+	if member == nil {
+		return nil, nil
+	}
+
+	allTokens, err := tokens.GetAll()
+	if err != nil {
+		allTokens = make([]tokens.TokenRecord, 0)
+	}
+
+	balances := buildTokenBalanceMap(allTokens)
+	summary := buildMemberSummary(*member, balances)
+	return &summary, nil
+}
+
+func buildTokenBalanceMap(allTokens []tokens.TokenRecord) map[string]int {
+	balances := make(map[string]int)
+	for _, token := range allTokens {
+		balances[token.MemberId] += token.Amount
+	}
+	return balances
+}
+
+func buildMemberSummary(member members.Member, balances map[string]int) MemberSummary {
+	attendanceCount, err := attendance.GetMemberAttendanceCount(member.Id)
+	if err != nil {
+		attendanceCount = 0
+	}
+
+	rsiHandle := ""
+	if member.RsiInfo != nil {
+		rsiHandle = member.RsiInfo.Handle
+	}
+
+	return MemberSummary{
+		ID:           member.Id,
+		Username:     member.Name,
+		Rank:         member.Rank.String(),
+		Attendance:   attendanceCount,
+		TokenBalance: balances[member.Id],
+		RSIHandle:    rsiHandle,
+	}
 }
 
 func paginateAttendanceRecords(records []AttendanceRecord, limit, page int) []AttendanceRecord {
