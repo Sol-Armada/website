@@ -86,7 +86,7 @@ func load() (Config, error) {
 			ClientID:     getEnv("DISCORD_CLIENT_ID", ""),
 			ClientSecret: getEnv("DISCORD_CLIENT_SECRET", ""),
 			RedirectURI:  getEnv("DISCORD_REDIRECT_URI", ""),
-			Scopes:       getEnvSlice("DISCORD_SCOPES", []string{"identify", "guilds"}),
+			Scopes:       getEnvSlice("DISCORD_SCOPES", []string{"identify", "guilds", "guilds.members.read"}),
 			GuildID:      getEnv("DISCORD_GUILD_ID", ""),
 		},
 		Roles: RolesConfig{

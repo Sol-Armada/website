@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,19 @@ const (
 	DiscordAuthURL  = "https://discord.com/oauth2/authorize"
 	DiscordTokenURL = "https://discord.com/api/oauth2/token"
 )
+
+type discordAPIError struct {
+	operation  string
+	statusCode int
+	body       string
+}
+
+func (e *discordAPIError) Error() string {
+	if e == nil {
+		return "discord API error"
+	}
+	return fmt.Sprintf("discord %s failed with status %d: %s", e.operation, e.statusCode, e.body)
+}
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
@@ -104,8 +118,10 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 	// Handle OAuth provider error responses (e.g. user pressed "Cancel" on Discord consent page).
 	if oauthError := c.QueryParam("error"); oauthError != "" {
 		errorMessage := c.QueryParam("error_description")
-		if errorMessage == "" {
-			errorMessage = "Authentication was cancelled"
+		if oauthError == "access_denied" {
+			errorMessage = "Authentication was cancelled in Discord"
+		} else if errorMessage == "" {
+			errorMessage = "Authentication failed"
 		}
 		h.log.Warn("OAuth callback returned error", "error", oauthError, "description", errorMessage)
 		return c.Redirect(
@@ -158,8 +174,9 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 	// Fetch guild member info to get roles
 	guildMember, err := h.fetchGuildMember(token.AccessToken)
 	if err != nil {
-		h.log.Error("Failed to fetch guild member", "error", err)
-		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=guild_access_denied&message=%s", h.frontendURL, url.QueryEscape("You must be a member of the Sol Armada guild")))
+		errorCode, errorMessage := classifyGuildAccessError(err)
+		h.log.Warn("Failed to fetch guild member", "error", err, "code", errorCode)
+		return c.Redirect(http.StatusFound, fmt.Sprintf("%s/auth/callback?error=%s&message=%s", h.frontendURL, url.QueryEscape(errorCode), url.QueryEscape(errorMessage)))
 	}
 
 	// Map Discord roles to application roles
@@ -277,7 +294,11 @@ func (h *AuthHandler) fetchGuildMember(accessToken string) (*dto.DiscordGuildMem
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("guild member fetch error: %s", string(body))
+		return nil, &discordAPIError{
+			operation:  "guild member lookup",
+			statusCode: resp.StatusCode,
+			body:       string(body),
+		}
 	}
 
 	var member dto.DiscordGuildMember
@@ -286,6 +307,26 @@ func (h *AuthHandler) fetchGuildMember(accessToken string) (*dto.DiscordGuildMem
 	}
 
 	return &member, nil
+}
+
+func classifyGuildAccessError(err error) (string, string) {
+	var discordErr *discordAPIError
+	if errors.As(err, &discordErr) {
+		switch discordErr.statusCode {
+		case http.StatusTooManyRequests:
+			return "discord_rate_limited", "Discord is rate limiting login attempts right now. Please wait a minute and try again."
+		case http.StatusNotFound:
+			return "guild_access_denied", "You must be a member of the Sol Armada guild."
+		case http.StatusForbidden:
+			return "guild_scope_missing", "Discord denied guild membership lookup. Ask an admin to verify OAuth scopes include guilds.members.read."
+		case http.StatusUnauthorized:
+			return "discord_token_invalid", "Discord authentication expired. Please try signing in again."
+		default:
+			return "guild_lookup_failed", "Unable to verify guild membership with Discord right now. Please try again shortly."
+		}
+	}
+
+	return "guild_lookup_failed", "Unable to verify guild membership with Discord right now. Please try again shortly."
 }
 
 // mapDiscordRoles maps Discord role IDs to application roles
