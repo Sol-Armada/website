@@ -1,129 +1,129 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import PortalShell from '@/components/layout/PortalShell.vue'
-import DataPanel from '@/components/ui/DataPanel.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
-import StatePanel from '@/components/ui/StatePanel.vue'
-import { adminService, type AttendanceRecord } from '@/services/adminService'
-import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
+  import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import PortalShell from '@/components/layout/PortalShell.vue'
+  import DataPanel from '@/components/ui/DataPanel.vue'
+  import PageHeader from '@/components/ui/PageHeader.vue'
+  import StatePanel from '@/components/ui/StatePanel.vue'
+  import { adminService, type AttendanceRecord } from '@/services/adminService'
+  import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
 
-const loading = ref(true)
-const isRefreshing = ref(false)
-const error = ref<string | null>(null)
-const records = ref<AttendanceRecord[]>([])
-const search = ref('')
-const page = ref(1)
-const limit = ref(25)
-const hasNextPage = ref(false)
-let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-let refreshTimer: number | null = null
-let inFlightRequest: Promise<void> | null = null
-let queuedRefreshMode: 'background' | 'blocking' | null = null
-const unsubscribers: Array<() => void> = []
+  const loading = ref(true)
+  const isRefreshing = ref(false)
+  const error = ref<string | null>(null)
+  const records = ref<AttendanceRecord[]>([])
+  const search = ref('')
+  const page = ref(1)
+  const limit = ref(25)
+  const hasNextPage = ref(false)
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  let refreshTimer: number | null = null
+  let inFlightRequest: Promise<void> | null = null
+  let queuedRefreshMode: 'background' | 'blocking' | null = null
+  const unsubscribers: Array<() => void> = []
 
-function scheduleRefresh() {
-  if (refreshTimer !== null) {
-    window.clearTimeout(refreshTimer)
-  }
-  refreshTimer = window.setTimeout(() => {
-    refreshTimer = null
-    void loadAttendance({ background: true })
-  }, 400)
-}
-
-async function loadAttendance(options: { background?: boolean } = {}): Promise<void> {
-  const isBackground = options.background === true
-
-  if (inFlightRequest !== null) {
-    queuedRefreshMode = !isBackground || queuedRefreshMode === 'blocking'
-      ? 'blocking'
-      : 'background'
-    await inFlightRequest
-    return
-  }
-
-  if (isBackground) {
-    isRefreshing.value = true
-  } else {
-    loading.value = true
-    error.value = null
-  }
-
-  const request = (async () => {
-    try {
-      const response = await adminService.getAttendance(limit.value, page.value, search.value || undefined)
-      records.value = response.records || []
-      hasNextPage.value = records.value.length === limit.value
-      error.value = null
-    } catch (error_: any) {
-      if (!isBackground || records.value.length === 0) {
-        error.value = error_?.message || 'Failed to load attendance records'
-        hasNextPage.value = false
-      }
-    } finally {
-      if (isBackground) {
-        isRefreshing.value = false
-      } else {
-        loading.value = false
-      }
+  function scheduleRefresh() {
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
     }
-  })()
-
-  inFlightRequest = request
-  await request
-  inFlightRequest = null
-
-  if (queuedRefreshMode !== null) {
-    const nextMode = queuedRefreshMode
-    queuedRefreshMode = null
-    void loadAttendance({ background: nextMode === 'background' })
-  }
-}
-
-function goToPreviousPage(): void {
-  if (page.value <= 1 || loading.value) return
-
-  page.value -= 1
-}
-
-function goToNextPage(): void {
-  if (!hasNextPage.value || loading.value) return
-
-  page.value += 1
-}
-
-watch(page, () => {
-  void loadAttendance()
-})
-
-watch(search, () => {
-  if (searchDebounceTimer) {
-    clearTimeout(searchDebounceTimer)
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null
+      void loadAttendance({ background: true })
+    }, 400)
   }
 
-  searchDebounceTimer = setTimeout(() => {
-    page.value = 1
-    void loadAttendance({ background: true })
-  }, 300)
-})
+  async function loadAttendance(options: { background?: boolean } = {}): Promise<void> {
+    const isBackground = options.background === true
 
-onMounted(async () => {
-  await loadAttendance()
-  unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
-})
+    if (inFlightRequest !== null) {
+      queuedRefreshMode = !isBackground || queuedRefreshMode === 'blocking'
+        ? 'blocking'
+        : 'background'
+      await inFlightRequest
+      return
+    }
 
-onBeforeUnmount(() => {
-  if (searchDebounceTimer) {
-    clearTimeout(searchDebounceTimer)
+    if (isBackground) {
+      isRefreshing.value = true
+    } else {
+      loading.value = true
+      error.value = null
+    }
+
+    const request = (async() => {
+      try {
+        const response = await adminService.getAttendance(limit.value, page.value, search.value || undefined)
+        records.value = response.records || []
+        hasNextPage.value = records.value.length === limit.value
+        error.value = null
+      } catch(error_: any) {
+        if (!isBackground || records.value.length === 0) {
+          error.value = error_?.message || 'Failed to load attendance records'
+          hasNextPage.value = false
+        }
+      } finally {
+        if (isBackground) {
+          isRefreshing.value = false
+        } else {
+          loading.value = false
+        }
+      }
+    })()
+
+    inFlightRequest = request
+    await request
+    inFlightRequest = null
+
+    if (queuedRefreshMode !== null) {
+      const nextMode = queuedRefreshMode
+      queuedRefreshMode = null
+      void loadAttendance({ background: nextMode === 'background' })
+    }
   }
-  if (refreshTimer !== null) {
-    window.clearTimeout(refreshTimer)
-    refreshTimer = null
+
+  function goToPreviousPage(): void {
+    if (page.value <= 1 || loading.value) return
+
+    page.value -= 1
   }
-  for (const unsubscribe of unsubscribers) {
-    unsubscribe()
+
+  function goToNextPage(): void {
+    if (!hasNextPage.value || loading.value) return
+
+    page.value += 1
   }
-})
+
+  watch(page, () => {
+    void loadAttendance()
+  })
+
+  watch(search, () => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer)
+    }
+
+    searchDebounceTimer = setTimeout(() => {
+      page.value = 1
+      void loadAttendance({ background: true })
+    }, 300)
+  })
+
+  onMounted(async() => {
+    await loadAttendance()
+    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
+  })
+
+  onBeforeUnmount(() => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer)
+    }
+    if (refreshTimer !== null) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe()
+    }
+  })
 </script>
 
 <template>
@@ -131,12 +131,17 @@ onBeforeUnmount(() => {
     <PageHeader subtitle="Attendance records list with simple paging controls." title="Attendance" />
 
     <DataPanel description="Review attendance records and page through history." title="Attendance Records">
-      <input v-model="search"
+      <input
+        v-model="search"
         class="mb-3 w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
-        placeholder="Search attendance..." type="search">
+        placeholder="Search attendance..."
+        type="search"
+      >
 
-      <p v-if="isRefreshing && !loading"
-        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+      <p
+        v-if="isRefreshing && !loading"
+        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant"
+      >
         Refreshing data...
       </p>
 
@@ -176,13 +181,19 @@ onBeforeUnmount(() => {
         <div class="flex items-center gap-2">
           <button
             class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="loading || page === 1" type="button" @click="goToPreviousPage">
+            :disabled="loading || page === 1"
+            type="button"
+            @click="goToPreviousPage"
+          >
             Previous
           </button>
 
           <button
             class="rounded-md border border-subtle px-3 py-1.5 transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="loading || !hasNextPage" type="button" @click="goToNextPage">
+            :disabled="loading || !hasNextPage"
+            type="button"
+            @click="goToNextPage"
+          >
             Next
           </button>
         </div>
