@@ -54,6 +54,7 @@ loki.source.journal "sol_armada_portal" {
 	path          = "/var/log/journal"
 	relabel_rules = discovery.relabel.sol_armada_portal.rules
 	forward_to    = [loki.process.sol_armada_portal.receiver]
+	matches       = "_SYSTEMD_UNIT=website.service"
 	labels        = {
 		job     = "sol-armada-portal",
 		service = "website",
@@ -88,6 +89,7 @@ loki.source.journal "sol_armada_portal_updater" {
 	path          = "/var/log/journal"
 	relabel_rules = discovery.relabel.sol_armada_portal_updater.rules
 	forward_to    = [loki.write.default.receiver]
+	matches       = "_SYSTEMD_UNIT=website-updater.service"
 	labels        = {
 		job     = "sol-armada-portal-updater",
 		service = "website-updater",
