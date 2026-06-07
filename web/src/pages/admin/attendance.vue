@@ -11,9 +11,11 @@ const loading = ref(true)
 const isRefreshing = ref(false)
 const error = ref<string | null>(null)
 const records = ref<AttendanceRecord[]>([])
+const search = ref('')
 const page = ref(1)
 const limit = ref(25)
 const hasNextPage = ref(false)
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let refreshTimer: number | null = null
 let inFlightRequest: Promise<void> | null = null
 let queuedRefreshMode: 'background' | 'blocking' | null = null
@@ -49,7 +51,7 @@ async function loadAttendance(options: { background?: boolean } = {}): Promise<v
 
   const request = (async () => {
     try {
-      const response = await adminService.getAttendance(limit.value, page.value)
+      const response = await adminService.getAttendance(limit.value, page.value, search.value || undefined)
       records.value = response.records || []
       hasNextPage.value = records.value.length === limit.value
       error.value = null
@@ -94,12 +96,26 @@ watch(page, () => {
   void loadAttendance()
 })
 
+watch(search, () => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    void loadAttendance({ background: true })
+  }, 300)
+})
+
 onMounted(async () => {
   await loadAttendance()
   unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
 })
 
 onBeforeUnmount(() => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
   if (refreshTimer !== null) {
     window.clearTimeout(refreshTimer)
     refreshTimer = null
@@ -115,6 +131,10 @@ onBeforeUnmount(() => {
     <PageHeader subtitle="Attendance records list with simple paging controls." title="Attendance" />
 
     <DataPanel description="Review attendance records and page through history." title="Attendance Records">
+      <input v-model="search"
+        class="mb-3 w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+        placeholder="Search attendance..." type="search">
+
       <p v-if="isRefreshing && !loading"
         class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
         Refreshing data...
@@ -146,7 +166,9 @@ onBeforeUnmount(() => {
         </table>
       </div>
 
-      <p v-else class="text-sm text-on-surface-variant">No attendance records available.</p>
+      <p v-else class="text-sm text-on-surface-variant">
+        {{ search ? 'No attendance records matched your search.' : 'No attendance records available.' }}
+      </p>
 
       <div class="mt-4 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
         <span>Page {{ page }}</span>

@@ -154,7 +154,7 @@ func (s *MemberService) getRecentTokenActivity(memberID string) ([]MemberActivit
 	limit := min(len(filtered), 5)
 
 	result := make([]MemberActivity, 0, limit)
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		record := filtered[i]
 		title := fmt.Sprintf("%+d tokens - %s", record.Amount, strings.TrimSpace(string(record.Reason)))
 		result = append(result, MemberActivity{

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"log/slog"
@@ -143,7 +145,7 @@ func (s *AdminService) GetOverviewStats(_ context.Context) (*AdminOverviewStats,
 	}, nil
 }
 
-func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int) ([]AttendanceRecord, error) {
+func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int, search string) ([]AttendanceRecord, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -151,7 +153,16 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int) 
 		page = 1
 	}
 
-	attendanceList, err := attendance.List(limit, page)
+	normalizedSearch := normalizeSearch(search)
+
+	listLimit := limit
+	listPage := page
+	if normalizedSearch != "" {
+		listLimit = 10000
+		listPage = 0
+	}
+
+	attendanceList, err := attendance.List(listLimit, listPage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch attendance records: %w", err)
 	}
@@ -169,6 +180,20 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int) 
 			participantCount = len(participants)
 		}
 
+		if normalizedSearch != "" {
+			if !matchesAnyField(normalizedSearch,
+				att.Name,
+				submittedBy,
+				strconv.Itoa(participantCount),
+				att.DateCreated.Format("2006-01-02"),
+				att.DateCreated.Format(time.RFC3339),
+				strconv.FormatBool(att.Recorded),
+				strconv.FormatBool(att.Successful),
+			) {
+				continue
+			}
+		}
+
 		result = append(result, AttendanceRecord{
 			ID:               att.Id,
 			Name:             att.Name,
@@ -180,16 +205,22 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int) 
 		})
 	}
 
+	if normalizedSearch != "" {
+		return paginateAttendanceRecords(result, limit, page), nil
+	}
+
 	return result, nil
 }
 
-func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int) ([]TokenTransaction, error) {
+func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search string) ([]TokenTransaction, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
 	if page < 1 {
 		page = 1
 	}
+
+	normalizedSearch := normalizeSearch(search)
 
 	allTokens, err := tokens.GetAll()
 	if err != nil {
@@ -201,19 +232,8 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int) ([]Tok
 		allTokens[i], allTokens[j] = allTokens[j], allTokens[i]
 	}
 
-	// Paginate
-	start := (page - 1) * limit
-	end := start + limit
-	if start > len(allTokens) {
-		start = len(allTokens)
-	}
-	if end > len(allTokens) {
-		end = len(allTokens)
-	}
-
-	result := make([]TokenTransaction, 0)
-	for i := start; i < end; i++ {
-		t := allTokens[i]
+	result := make([]TokenTransaction, 0, len(allTokens))
+	for _, t := range allTokens {
 		comment := ""
 		if t.Comment != nil {
 			comment = *t.Comment
@@ -225,6 +245,21 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int) ([]Tok
 		attendanceId := ""
 		if t.AttendanceId != nil {
 			attendanceId = *t.AttendanceId
+		}
+
+		if normalizedSearch != "" {
+			if !matchesAnyField(normalizedSearch,
+				t.MemberId,
+				strconv.Itoa(t.Amount),
+				string(t.Reason),
+				comment,
+				giverId,
+				attendanceId,
+				t.CreatedAt.Format("2006-01-02"),
+				t.CreatedAt.Format(time.RFC3339),
+			) {
+				continue
+			}
 		}
 
 		result = append(result, TokenTransaction{
@@ -239,7 +274,7 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int) ([]Tok
 		})
 	}
 
-	return result, nil
+	return paginateTokenTransactions(result, limit, page), nil
 }
 
 func (s *AdminService) GetTokenLedgerAnalytics(_ context.Context) (*TokenLedgerAnalytics, error) {
@@ -377,14 +412,11 @@ func (s *AdminService) GetMembers(_ context.Context, limit, page int, search str
 		balances[t.MemberId] += t.Amount
 	}
 
+	normalizedSearch := normalizeSearch(search)
+
 	result := make([]MemberSummary, 0)
 	for _, m := range memberList {
 		if m.Id == "" {
-			continue
-		}
-
-		// Filter by search if provided
-		if search != "" && !matchesSearch(m.Name, search) {
 			continue
 		}
 
@@ -396,6 +428,19 @@ func (s *AdminService) GetMembers(_ context.Context, limit, page int, search str
 		rsiHandle := ""
 		if m.RsiInfo != nil {
 			rsiHandle = m.RsiInfo.Handle
+		}
+
+		if normalizedSearch != "" {
+			if !matchesAnyField(normalizedSearch,
+				m.Name,
+				m.Id,
+				m.Rank.String(),
+				rsiHandle,
+				strconv.Itoa(attendance),
+				strconv.Itoa(balances[m.Id]),
+			) {
+				continue
+			}
 		}
 
 		result = append(result, MemberSummary{
@@ -415,9 +460,68 @@ func (s *AdminService) GetMembers(_ context.Context, limit, page int, search str
 	return result, nil
 }
 
-func matchesSearch(name, search string) bool {
+func paginateAttendanceRecords(records []AttendanceRecord, limit, page int) []AttendanceRecord {
+	start := (page - 1) * limit
+	if start >= len(records) {
+		return []AttendanceRecord{}
+	}
+
+	end := min(start+limit, len(records))
+
+	return records[start:end]
+}
+
+func paginateTokenTransactions(records []TokenTransaction, limit, page int) []TokenTransaction {
+	start := (page - 1) * limit
+	if start >= len(records) {
+		return []TokenTransaction{}
+	}
+
+	end := min(start+limit, len(records))
+
+	return records[start:end]
+}
+
+func normalizeSearch(search string) string {
+	return strings.TrimSpace(strings.ToLower(search))
+}
+
+func fuzzyContains(haystack, needle string) bool {
+	normalizedHaystack := normalizeSearch(haystack)
+	normalizedNeedle := normalizeSearch(needle)
+	needleRunes := []rune(normalizedNeedle)
+
+	if len(needleRunes) == 0 {
+		return true
+	}
+
+	if strings.Contains(normalizedHaystack, normalizedNeedle) {
+		return true
+	}
+
+	needleIndex := 0
+	for _, haystackChar := range normalizedHaystack {
+		if haystackChar == needleRunes[needleIndex] {
+			needleIndex += 1
+			if needleIndex == len(needleRunes) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func matchesAnyField(search string, fields ...string) bool {
 	if search == "" {
 		return true
 	}
-	return len(name) >= len(search) && name[:len(search)] == search[:len(name)]
+
+	for _, field := range fields {
+		if fuzzyContains(field, search) {
+			return true
+		}
+	}
+
+	return false
 }

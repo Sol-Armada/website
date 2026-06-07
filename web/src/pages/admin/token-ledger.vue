@@ -17,6 +17,7 @@ const loading = ref(true)
 const isRefreshing = ref(false)
 const error = ref<string | null>(null)
 const transactions = ref<TokenTransaction[]>([])
+const ledgerSearch = ref('')
 const page = ref(1)
 const limit = ref(25)
 const hasNextPage = ref(false)
@@ -30,6 +31,7 @@ let inFlightLedgerRequest: Promise<void> | null = null
 let queuedLedgerRefreshMode: 'background' | 'blocking' | null = null
 let inFlightAnalyticsRequest: Promise<void> | null = null
 let queuedAnalyticsRefreshMode: 'background' | 'blocking' | null = null
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const unsubscribers: Array<() => void> = []
 
 function scheduleRefresh() {
@@ -126,7 +128,7 @@ async function loadTokenLedger(options: { background?: boolean } = {}): Promise<
 
   const request = (async () => {
     try {
-      const response = await adminService.getTokenLedger(limit.value, page.value)
+      const response = await adminService.getTokenLedger(limit.value, page.value, ledgerSearch.value || undefined)
       transactions.value = response.records || []
       hasNextPage.value = transactions.value.length === limit.value
       error.value = null
@@ -171,12 +173,26 @@ watch(page, () => {
   void loadTokenLedger()
 })
 
+watch(ledgerSearch, () => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+
+  searchDebounceTimer = setTimeout(() => {
+    page.value = 1
+    void loadTokenLedger({ background: true })
+  }, 300)
+})
+
 onMounted(async () => {
   await Promise.all([loadTokenLedger(), loadAnalytics()])
   unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_TOKEN_LEDGER, scheduleRefresh))
 })
 
 onBeforeUnmount(() => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
   if (refreshTimer !== null) {
     window.clearTimeout(refreshTimer)
     refreshTimer = null
@@ -270,6 +286,10 @@ onBeforeUnmount(() => {
     </DataPanel>
 
     <DataPanel description="Review credit and debit transactions across pages." title="Ledger Entries">
+      <input v-model="ledgerSearch"
+        class="mb-3 w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+        placeholder="Search ledger entries..." type="search">
+
       <p v-if="isRefreshing && !loading"
         class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
         Refreshing data...
@@ -305,7 +325,9 @@ onBeforeUnmount(() => {
         </table>
       </div>
 
-      <p v-else class="text-sm text-on-surface-variant">No ledger entries available.</p>
+      <p v-else class="text-sm text-on-surface-variant">
+        {{ ledgerSearch ? 'No ledger entries matched your search.' : 'No ledger entries available.' }}
+      </p>
 
       <div class="mt-4 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
         <span>Page {{ page }}</span>

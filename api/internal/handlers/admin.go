@@ -17,8 +17,8 @@ import (
 // AdminServiceInterface defines the interface for admin operations
 type AdminServiceInterface interface {
 	GetOverviewStats(context.Context) (*service.AdminOverviewStats, error)
-	GetAttendanceRecords(context.Context, int, int) ([]service.AttendanceRecord, error)
-	GetTokenLedger(context.Context, int, int) ([]service.TokenTransaction, error)
+	GetAttendanceRecords(context.Context, int, int, string) ([]service.AttendanceRecord, error)
+	GetTokenLedger(context.Context, int, int, string) ([]service.TokenTransaction, error)
 	GetTokenLedgerAnalytics(context.Context) (*service.TokenLedgerAnalytics, error)
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 }
@@ -80,7 +80,9 @@ func (h *AdminHandler) GetAttendance(c echo.Context) error {
 		}
 	}
 
-	result, err := h.adminService.GetAttendanceRecords(c.Request().Context(), limit, page)
+	search := c.QueryParam("search")
+
+	result, err := h.adminService.GetAttendanceRecords(c.Request().Context(), limit, page, search)
 	if err != nil {
 		h.logger.Error("Failed to fetch attendance records", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -119,7 +121,9 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 		}
 	}
 
-	result, err := h.adminService.GetTokenLedger(c.Request().Context(), limit, page)
+	search := c.QueryParam("search")
+
+	result, err := h.adminService.GetTokenLedger(c.Request().Context(), limit, page, search)
 	if err != nil {
 		h.logger.Error("Failed to fetch token ledger", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{

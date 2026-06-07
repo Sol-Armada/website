@@ -81,17 +81,19 @@ export const adminService = {
     return requestJson<AdminOverviewData>('/api/admin/overview')
   },
 
-  async getAttendance(limit = 50, page = 1): Promise<PaginatedResponse<AttendanceRecord>> {
+  async getAttendance(limit = 50, page = 1, search?: string): Promise<PaginatedResponse<AttendanceRecord>> {
     return requestJson<PaginatedResponse<AttendanceRecord>>('/api/admin/attendance', undefined, {
       limit,
       page,
+      search,
     })
   },
 
-  async getTokenLedger(limit = 50, page = 1): Promise<PaginatedResponse<TokenTransaction>> {
+  async getTokenLedger(limit = 50, page = 1, search?: string): Promise<PaginatedResponse<TokenTransaction>> {
     return requestJson<PaginatedResponse<TokenTransaction>>('/api/admin/token-ledger', undefined, {
       limit,
       page,
+      search,
     })
   },
 

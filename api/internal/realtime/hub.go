@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -178,13 +179,7 @@ func AllowedTopicsForRoles(roles []string) map[string]bool {
 		TopicSystemHealth: true,
 	}
 
-	isAdmin := false
-	for _, role := range roles {
-		if role == "admin" {
-			isAdmin = true
-			break
-		}
-	}
+	isAdmin := slices.Contains(roles, "admin")
 
 	if isAdmin {
 		allowed[TopicAdminMembers] = true
