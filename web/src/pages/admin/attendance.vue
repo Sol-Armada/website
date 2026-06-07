@@ -8,12 +8,15 @@ import { adminService, type AttendanceRecord } from '@/services/adminService'
 import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
 
 const loading = ref(true)
+const isRefreshing = ref(false)
 const error = ref<string | null>(null)
 const records = ref<AttendanceRecord[]>([])
 const page = ref(1)
 const limit = ref(25)
 const hasNextPage = ref(false)
 let refreshTimer: number | null = null
+let inFlightRequest: Promise<void> | null = null
+let queuedRefreshMode: 'background' | 'blocking' | null = null
 const unsubscribers: Array<() => void> = []
 
 function scheduleRefresh() {
@@ -22,23 +25,56 @@ function scheduleRefresh() {
   }
   refreshTimer = window.setTimeout(() => {
     refreshTimer = null
-    void loadAttendance()
+    void loadAttendance({ background: true })
   }, 400)
 }
 
-async function loadAttendance(): Promise<void> {
-  loading.value = true
-  error.value = null
+async function loadAttendance(options: { background?: boolean } = {}): Promise<void> {
+  const isBackground = options.background === true
 
-  try {
-    const response = await adminService.getAttendance(limit.value, page.value)
-    records.value = response.records || []
-    hasNextPage.value = records.value.length === limit.value
-  } catch (error_: any) {
-    error.value = error_?.message || 'Failed to load attendance records'
-    hasNextPage.value = false
-  } finally {
-    loading.value = false
+  if (inFlightRequest !== null) {
+    queuedRefreshMode = !isBackground || queuedRefreshMode === 'blocking'
+      ? 'blocking'
+      : 'background'
+    await inFlightRequest
+    return
+  }
+
+  if (isBackground) {
+    isRefreshing.value = true
+  } else {
+    loading.value = true
+    error.value = null
+  }
+
+  const request = (async () => {
+    try {
+      const response = await adminService.getAttendance(limit.value, page.value)
+      records.value = response.records || []
+      hasNextPage.value = records.value.length === limit.value
+      error.value = null
+    } catch (error_: any) {
+      if (!isBackground || records.value.length === 0) {
+        error.value = error_?.message || 'Failed to load attendance records'
+        hasNextPage.value = false
+      }
+    } finally {
+      if (isBackground) {
+        isRefreshing.value = false
+      } else {
+        loading.value = false
+      }
+    }
+  })()
+
+  inFlightRequest = request
+  await request
+  inFlightRequest = null
+
+  if (queuedRefreshMode !== null) {
+    const nextMode = queuedRefreshMode
+    queuedRefreshMode = null
+    void loadAttendance({ background: nextMode === 'background' })
   }
 }
 
@@ -79,6 +115,11 @@ onBeforeUnmount(() => {
     <PageHeader subtitle="Attendance records list with simple paging controls." title="Attendance" />
 
     <DataPanel description="Review attendance records and page through history." title="Attendance Records">
+      <p v-if="isRefreshing && !loading"
+        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+        Refreshing data...
+      </p>
+
       <StatePanel v-if="loading" message="Loading attendance records..." title="Please wait" />
 
       <StatePanel v-else-if="error" :message="error" title="Attendance load failed" tone="error" />
