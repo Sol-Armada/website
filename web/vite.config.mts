@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 import Vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
@@ -5,8 +6,23 @@ import Fonts from 'unplugin-fonts/vite'
 import { defineConfig } from 'vite'
 import VueRouter from 'vue-router/vite'
 
+const appVersion = (() => {
+  if (process.env.VITE_APP_VERSION) {
+    return process.env.VITE_APP_VERSION
+  }
+
+  try {
+    return execSync('git describe --tags --abbrev=0', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'dev'
+  }
+})()
+
 export default defineConfig({
   envDir: '..',
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [VueRouter({ dts: 'src/typed-router.d.ts' }), Vue(), Fonts({
     fontsource: {
       families: [

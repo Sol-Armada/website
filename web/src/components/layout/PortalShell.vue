@@ -16,6 +16,7 @@
   const authStore = useAuthStore()
   const appStore = useAppStore()
   const mobileOpen = ref(false)
+  const portalVersion = __APP_VERSION__
 
   const realtimeBannerVisible = computed(() => {
     return appStore.realtimeState === 'connecting'
@@ -159,6 +160,10 @@
           >
             Logout
           </button>
+
+          <footer class="px-2 py-3 text-xs text-on-surface-variant">
+            {{ portalVersion }}
+          </footer>
         </nav>
       </aside>
 
@@ -170,7 +175,7 @@
     <div v-if="mobileOpen" class="fixed inset-0 z-40 md:hidden">
       <button class="absolute inset-0 bg-background/75" type="button" @click="mobileOpen = false" />
 
-      <aside class="absolute left-0 top-0 h-full w-72 border-r border-subtle bg-surface p-3">
+      <aside class="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-subtle bg-surface p-3">
         <p class="px-2 py-2 text-xs uppercase tracking-wide text-on-surface-variant">Member</p>
 
         <RouterLink
@@ -213,6 +218,10 @@
         >
           Logout
         </button>
+
+        <footer class="mt-auto px-2 py-3 text-xs text-on-surface-variant">
+          {{ portalVersion }}
+        </footer>
       </aside>
     </div>
   </div>
