@@ -172,9 +172,9 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 
 	slices.SortFunc(result, func(a, b service.TokenTransaction) int {
 		if a.CreatedAt.After(b.CreatedAt) {
-			return -1
-		} else if a.CreatedAt.Before(b.CreatedAt) {
 			return 1
+		} else if a.CreatedAt.Before(b.CreatedAt) {
+			return -1
 		}
 		return 0
 	})
