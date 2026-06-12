@@ -38,6 +38,7 @@ type AttendanceRecord struct {
 type TokenTransaction struct {
 	ID           string    `json:"id"`
 	MemberID     string    `json:"memberId"`
+	MemberName   string    `json:"memberName,omitempty"`
 	Amount       int       `json:"amount"`
 	Reason       string    `json:"reason"`
 	CreatedAt    time.Time `json:"createdAt"`
@@ -449,6 +450,21 @@ func (s *AdminService) GetMembers(ctx context.Context, limit, page int, search s
 	return result, nil
 }
 
+func (s *AdminService) GetMembersByIds(ctx context.Context, ids []string) (map[string]MemberSummary, error) {
+	members, err := members.GetList(ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch members by ids: %w", err)
+	}
+
+	result := make(map[string]MemberSummary)
+	for _, m := range members {
+		summary := buildMemberSummary(*m, nil) // Assuming balances are not needed here
+		result[m.Id] = summary
+	}
+
+	return result, nil
+}
+
 func (s *AdminService) GetMemberSummaryByID(_ context.Context, memberID string) (*MemberSummary, error) {
 	if strings.TrimSpace(memberID) == "" {
 		return nil, nil
@@ -495,14 +511,20 @@ func buildMemberSummary(member members.Member, balances map[string]int) MemberSu
 		rsiHandle = member.RsiInfo.Handle
 	}
 
-	return MemberSummary{
-		ID:           member.Id,
-		Username:     member.Name,
-		Rank:         member.Rank.String(),
-		Attendance:   attendanceCount,
-		TokenBalance: balances[member.Id],
-		RSIHandle:    rsiHandle,
+	summary := MemberSummary{
+		ID:         member.Id,
+		Username:   member.Name,
+		Rank:       member.Rank.String(),
+		Attendance: attendanceCount,
+		RSIHandle:  rsiHandle,
 	}
+	if balances != nil && len(balances) > 0 {
+		if tokenBalance, ok := balances[member.Id]; ok {
+			summary.TokenBalance = tokenBalance
+		}
+	}
+
+	return summary
 }
 
 func paginateAttendanceRecords(records []AttendanceRecord, limit, page int) []AttendanceRecord {

@@ -22,6 +22,7 @@ export interface AttendanceRecord {
 export interface TokenTransaction {
   id: string
   memberId: string
+  memberName: string
   amount: number
   reason: string
   createdAt: string

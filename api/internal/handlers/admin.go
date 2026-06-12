@@ -21,6 +21,7 @@ type AdminServiceInterface interface {
 	GetTokenLedger(context.Context, int, int, string) ([]service.TokenTransaction, error)
 	GetTokenLedgerAnalytics(context.Context) (*service.TokenLedgerAnalytics, error)
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
+	GetMembersByIds(context.Context, []string) (map[string]service.MemberSummary, error)
 }
 
 var _ AdminServiceInterface = (*service.AdminService)(nil)
@@ -132,6 +133,41 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 			Error:   "token_ledger_failed",
 			Message: "Failed to fetch token ledger",
 		})
+	}
+
+	// collect ids to turn into names
+	userIDs := make(map[string]struct{})
+	for _, tx := range result {
+		userIDs[tx.MemberID] = struct{}{}
+	}
+
+	memberIDs := make([]string, 0, len(userIDs))
+	for id := range userIDs {
+		memberIDs = append(memberIDs, id)
+	}
+
+	members, err := h.adminService.GetMembersByIds(c.Request().Context(), memberIDs)
+	if err != nil {
+		h.logger.Error("Failed to fetch member details", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "member_fetch_failed",
+			Message: "Failed to fetch member details",
+		})
+	}
+
+	memberNames := make(map[string]string)
+	for id, member := range members {
+		memberNames[id] = member.Username
+	}
+
+	// enrich transactions with member names
+	for i, tx := range result {
+		if name, ok := memberNames[tx.MemberID]; ok {
+			result[i].MemberName = tx.MemberID
+			if name != "" {
+				result[i].MemberName = name
+			}
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{

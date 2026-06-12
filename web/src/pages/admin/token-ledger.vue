@@ -370,14 +370,23 @@
 
           <tbody>
             <tr v-for="transaction in transactions" :key="transaction.id" class="border-t border-subtle">
-              <td class="px-3 py-2">{{ transaction.memberId }}</td>
+              <td class="px-3 py-2">{{ transaction.memberName }}</td>
 
               <td class="px-3 py-2" :class="transaction.amount >= 0 ? 'text-success' : 'text-error'">
                 {{ transaction.amount >= 0 ? '+' : '' }}{{ transaction.amount }}
               </td>
 
               <td class="px-3 py-2">{{ transaction.reason }}</td>
-              <td class="px-3 py-2">{{ new Date(transaction.createdAt).toLocaleDateString() }}</td>
+
+              <td class="px-3 py-2">{{ new Date(transaction.createdAt).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              }) }}</td>
             </tr>
           </tbody>
         </table>
