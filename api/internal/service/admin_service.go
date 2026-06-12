@@ -229,11 +229,6 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search
 		return nil, fmt.Errorf("failed to fetch token records: %w", err)
 	}
 
-	// Sort by newest first
-	for i, j := 0, len(allTokens)-1; i < j; i, j = i+1, j-1 {
-		allTokens[i], allTokens[j] = allTokens[j], allTokens[i]
-	}
-
 	result := make([]TokenTransaction, 0, len(allTokens))
 	for _, t := range allTokens {
 		comment := ""
