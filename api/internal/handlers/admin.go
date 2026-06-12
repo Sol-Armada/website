@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"slices"
@@ -176,7 +177,7 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 		} else if a.CreatedAt.Before(b.CreatedAt) {
 			return 1
 		}
-		return 0
+		return cmp.Compare(a.MemberName, b.MemberName)
 	})
 
 	return c.JSON(http.StatusOK, map[string]any{
