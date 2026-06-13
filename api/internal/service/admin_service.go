@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,15 +38,16 @@ type AttendanceRecord struct {
 }
 
 type TokenTransaction struct {
-	ID           string    `json:"id"`
-	MemberID     string    `json:"memberId"`
-	MemberName   string    `json:"memberName,omitempty"`
-	Amount       int       `json:"amount"`
-	Reason       string    `json:"reason"`
-	CreatedAt    time.Time `json:"createdAt"`
-	Comment      string    `json:"comment,omitempty"`
-	GiverID      string    `json:"giverId,omitempty"`
-	AttendanceID string    `json:"attendanceId,omitempty"`
+	ID             string    `json:"id"`
+	MemberID       string    `json:"memberId"`
+	MemberName     string    `json:"memberName,omitempty"`
+	Amount         int       `json:"amount"`
+	Reason         string    `json:"reason"`
+	CreatedAt      time.Time `json:"createdAt"`
+	Comment        string    `json:"comment,omitempty"`
+	GiverID        string    `json:"giverId,omitempty"`
+	AttendanceID   string    `json:"attendanceId,omitempty"`
+	AttendanceName string    `json:"attendanceName,omitempty"`
 }
 
 type TokenPeriodAnalytics struct {
@@ -229,6 +232,39 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search
 		return nil, fmt.Errorf("failed to fetch token records: %w", err)
 	}
 
+	memberMap := make(map[string]*members.Member)
+	for _, token := range allTokens {
+		memberMap[token.MemberId] = nil
+		if token.GiverId != nil {
+			memberMap[*token.GiverId] = nil
+		}
+	}
+
+	members, err := members.GetList(slices.Collect(maps.Keys(memberMap)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch member details: %w", err)
+	}
+
+	for _, m := range members {
+		memberMap[m.Id] = m
+	}
+
+	attendanceMap := make(map[string]*attendance.Attendance)
+	for _, token := range allTokens {
+		if token.AttendanceId != nil {
+			attendanceMap[*token.AttendanceId] = nil
+		}
+	}
+
+	attendances, err := attendance.ListByIds(slices.Collect(maps.Keys(attendanceMap)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch attendance details: %w", err)
+	}
+
+	for _, a := range attendances {
+		attendanceMap[a.Id] = a
+	}
+
 	result := make([]TokenTransaction, 0, len(allTokens))
 	for _, t := range allTokens {
 		comment := ""
@@ -246,12 +282,27 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search
 
 		if normalizedSearch != "" {
 			if !matchesAnyField(normalizedSearch,
-				t.MemberId,
+				func() string {
+					if member, ok := memberMap[t.MemberId]; ok && member != nil {
+						return member.Name
+					}
+					return ""
+				}(),
 				strconv.Itoa(t.Amount),
 				string(t.Reason),
 				comment,
-				giverId,
-				attendanceId,
+				func() string {
+					if giver, ok := memberMap[giverId]; ok && giver != nil {
+						return giver.Name
+					}
+					return ""
+				}(),
+				func() string {
+					if att, ok := attendanceMap[attendanceId]; ok && att != nil {
+						return att.Name
+					}
+					return ""
+				}(),
 				t.CreatedAt.Format("2006-01-02"),
 				t.CreatedAt.Format(time.RFC3339),
 			) {
@@ -268,6 +319,12 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search
 			Comment:      comment,
 			GiverID:      giverId,
 			AttendanceID: attendanceId,
+			AttendanceName: func() string {
+				if att, ok := attendanceMap[attendanceId]; ok && att != nil {
+					return att.Name
+				}
+				return ""
+			}(),
 		})
 	}
 
@@ -580,6 +637,10 @@ func matchesAnyField(search string, fields ...string) bool {
 	}
 
 	for _, field := range fields {
+		if field == "" {
+			continue
+		}
+
 		if fuzzyContains(field, search) {
 			return true
 		}

@@ -364,6 +364,7 @@
               <th class="px-3 py-2">Member</th>
               <th class="px-3 py-2">Amount</th>
               <th class="px-3 py-2">Reason</th>
+              <th class="px-3 py-2">Event Name</th>
               <th class="px-3 py-2">Date</th>
             </tr>
           </thead>
@@ -377,6 +378,8 @@
               </td>
 
               <td class="px-3 py-2">{{ transaction.reason }}</td>
+
+              <td class="px-3 py-2">{{ transaction.attendanceName || '—' }}</td>
 
               <td class="px-3 py-2">{{ new Date(transaction.createdAt).toLocaleDateString('en-US', {
                 weekday: 'long',

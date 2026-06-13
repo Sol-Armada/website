@@ -29,6 +29,7 @@ export interface TokenTransaction {
   comment?: string
   giverId?: string
   attendanceId?: string
+  attendanceName?: string
 }
 
 export interface TokenPeriodAnalytics {
