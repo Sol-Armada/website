@@ -83,6 +83,11 @@
         <StatCard detail="Active this month" label="Active Members" :value="overview.activeThisMonth" />
       </section>
 
+      <section class="mt-6 grid gap-4 lg:grid-cols-2">
+        <StatCard detail="Unique participants in tracked events" label="Unique Attendees" :value="overview.uniqueAttendees" />
+        <StatCard detail="Average attendees per tracked event" label="Average Attendance" :value="overview.averageAttendance" />
+      </section>
+
       <!-- <section class="tactical-panel mt-6 p-5">
         <h2 class="text-lg font-semibold text-on-surface">Quick Links</h2>
         <p class="mt-2 text-sm text-on-surface-variant">Administrative tools and management functions</p>
@@ -129,16 +134,6 @@
           </button>
         </div>
       </section> -->
-
-      <section class="mt-6 grid gap-4 lg:grid-cols-2">
-        <DataPanel description="Unique participants in tracked events." title="Unique Attendees">
-          <p class="mono-numeric text-2xl font-semibold text-primary">{{ overview.uniqueAttendees }}</p>
-        </DataPanel>
-
-        <DataPanel description="Average attendees per tracked event." title="Average Attendance">
-          <p class="mono-numeric text-2xl font-semibold text-primary">{{ overview.averageAttendance }}</p>
-        </DataPanel>
-      </section>
     </template>
   </PortalShell>
 </template>

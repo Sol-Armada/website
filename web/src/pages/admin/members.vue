@@ -230,21 +230,26 @@
 
 <template>
   <PortalShell>
-    <PageHeader subtitle="Searchable member directory with rank tags and simple paging." title="Members" />
+    <PageHeader subtitle="" title="Members" />
 
-    <DataPanel description="Browse members with search and paging controls." title="Member Directory">
+    <DataPanel description="" title="">
       <input
         v-model="search"
-        class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface mb-2"
+        class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
         placeholder="Search members..."
         type="search"
       >
 
-      <br>
+      <div class="mb-3 mt-2 h-0.5 w-full overflow-hidden rounded-full bg-surface-variant/40">
+        <div
+          class="h-full w-full bg-primary/80 transition-opacity duration-150"
+          :class="isRefreshing && !loading ? 'animate-pulse opacity-100' : 'opacity-0'"
+        />
+      </div>
 
       <StatePanel v-if="error" :message="error" title="Members load failed" tone="error" />
 
-      <div v-else-if="members.length > 0" class="overflow-x-auto rounded-lg border border-subtle">
+      <div v-else-if="members.length > 0" class="overflow-x-auto rounded-lg border border-subtle mt-2">
         <table class="w-full text-left text-sm text-on-surface">
           <thead class="bg-surface-variant/40 text-on-surface-variant">
             <tr>
@@ -266,7 +271,9 @@
         </table>
       </div>
 
-      <p v-else class="text-sm text-on-surface-variant">No members found.</p>
+      <p v-else class="text-sm text-on-surface-variant">
+        {{ search ? 'No members matched your search.' : 'No members found.' }}
+      </p>
 
       <div class="mt-4 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
         <span>Page {{ page }}</span>
