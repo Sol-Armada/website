@@ -287,6 +287,7 @@ func main() {
 	memberAPI := api.Group("/member")
 	memberAPI.GET("/dashboard", memberHandler.GetDashboard)
 	memberAPI.GET("/profile", memberHandler.GetProfile)
+	memberAPI.GET("/token-ledger", memberHandler.GetTokenLedger)
 
 	adminAPI := api.Group("/admin")
 	adminAPI.GET("/overview", adminHandler.GetOverview)

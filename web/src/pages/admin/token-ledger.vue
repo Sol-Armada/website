@@ -235,7 +235,7 @@
 <template>
   <PortalShell>
     <PageHeader
-      subtitle="Token activity analytics with weekly and monthly earning and spending patterns."
+      subtitle=""
       title="Token Ledger"
     />
 

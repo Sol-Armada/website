@@ -44,9 +44,9 @@
     <section v-else-if="profile" class="grid gap-4 lg:grid-cols-3">
       <DataPanel description="Current authenticated member profile." title="Identity">
         <p class="text-base font-semibold text-on-surface">{{ profile.username }}</p>
-        <p v-if="profile.email" class="mt-2 text-sm text-on-surface-variant">{{ profile.email }}</p>
         <p class="mt-2 text-sm text-on-surface-variant">Rank: {{ profile.rank }}</p>
         <p v-if="profile.rsiHandle" class="mt-2 text-sm text-on-surface-variant">RSI: {{ profile.rsiHandle }}</p>
+        <p class="mt-2 text-sm text-on-surface-variant">Validated: {{ profile.validated ? 'Yes' : 'No' }}</p>
       </DataPanel>
 
       <StatCard detail="Events attended" label="Attendance" :value="profile.attendanceCount" />
