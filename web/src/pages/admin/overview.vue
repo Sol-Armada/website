@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import { onBeforeUnmount, onMounted, ref } from 'vue'
+  import { RouterLink } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
@@ -33,7 +34,7 @@
     }
     refreshTimer = window.setTimeout(() => {
       refreshTimer = null
-      loadOverview()
+      // loadOverview()
     }, 400)
   }
 
@@ -61,7 +62,7 @@
 <template>
   <PortalShell>
     <PageHeader
-      subtitle="Skeleton admin KPI surface for system health and operational totals."
+      subtitle="Organization metrics, admin tools, and operational totals."
       title="Admin Overview"
     />
 
@@ -82,13 +83,60 @@
         <StatCard detail="Active this month" label="Active Members" :value="overview.activeThisMonth" />
       </section>
 
+      <!-- <section class="tactical-panel mt-6 p-5">
+        <h2 class="text-lg font-semibold text-on-surface">Quick Links</h2>
+        <p class="mt-2 text-sm text-on-surface-variant">Administrative tools and management functions</p>
+
+        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <RouterLink
+            class="flex items-center gap-3 rounded-lg border border-divider bg-surface/50 px-4 py-3 text-sm font-medium text-on-surface hover:border-primary hover:bg-surface transition-all"
+            to="/admin/members"
+          >
+            <span>👥</span>
+            <span>Manage Members</span>
+          </RouterLink>
+
+          <RouterLink
+            class="flex items-center gap-3 rounded-lg border border-divider bg-surface/50 px-4 py-3 text-sm font-medium text-on-surface hover:border-primary hover:bg-surface transition-all"
+            to="/admin/attendance"
+          >
+            <span>📅</span>
+            <span>Attendance Reports</span>
+          </RouterLink>
+
+          <RouterLink
+            class="flex items-center gap-3 rounded-lg border border-divider bg-surface/50 px-4 py-3 text-sm font-medium text-on-surface hover:border-primary hover:bg-surface transition-all"
+            to="/admin/token-ledger"
+          >
+            <span>🪙</span>
+            <span>Token Ledger</span>
+          </RouterLink>
+
+          <button
+            class="flex items-center gap-3 rounded-lg border border-divider bg-surface/50 px-4 py-3 text-sm font-medium text-on-surface hover:border-primary hover:bg-surface transition-all"
+            disabled
+          >
+            <span>👤</span>
+            <span>Role Management</span>
+          </button>
+
+          <button
+            class="flex items-center gap-3 rounded-lg border border-divider bg-surface/50 px-4 py-3 text-sm font-medium text-on-surface hover:border-primary hover:bg-surface transition-all"
+            disabled
+          >
+            <span>⚙️</span>
+            <span>Organization Settings</span>
+          </button>
+        </div>
+      </section> -->
+
       <section class="mt-6 grid gap-4 lg:grid-cols-2">
         <DataPanel description="Unique participants in tracked events." title="Unique Attendees">
-          <p class="text-2xl font-semibold text-on-surface">{{ overview.uniqueAttendees }}</p>
+          <p class="mono-numeric text-2xl font-semibold text-primary">{{ overview.uniqueAttendees }}</p>
         </DataPanel>
 
         <DataPanel description="Average attendees per tracked event." title="Average Attendance">
-          <p class="text-2xl font-semibold text-on-surface">{{ overview.averageAttendance }}</p>
+          <p class="mono-numeric text-2xl font-semibold text-primary">{{ overview.averageAttendance }}</p>
         </DataPanel>
       </section>
     </template>

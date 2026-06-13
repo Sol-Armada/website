@@ -570,7 +570,7 @@ func buildMemberSummary(member members.Member, balances map[string]int) MemberSu
 		Attendance: attendanceCount,
 		RSIHandle:  rsiHandle,
 	}
-	if balances != nil && len(balances) > 0 {
+	if len(balances) > 0 {
 		if tokenBalance, ok := balances[member.Id]; ok {
 			summary.TokenBalance = tokenBalance
 		}
