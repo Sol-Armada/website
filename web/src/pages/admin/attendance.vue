@@ -156,9 +156,9 @@
 
 <template>
   <PortalShell>
-    <PageHeader subtitle="Attendance records list with simple paging controls." title="Attendance" />
+    <PageHeader subtitle="" title="Attendance" />
 
-    <DataPanel description="Review attendance records and page through history." title="Attendance Records">
+    <DataPanel description="" title="">
       <input
         v-model="search"
         class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
@@ -173,9 +173,7 @@
         />
       </div>
 
-      <StatePanel v-if="loading" message="Loading attendance records..." title="Please wait" />
-
-      <StatePanel v-else-if="error" :message="error" title="Attendance load failed" tone="error" />
+      <StatePanel v-if="error" :message="error" title="Attendance load failed" tone="error" />
 
       <div v-else-if="records.length > 0" class="overflow-x-auto rounded-lg border border-subtle">
         <table class="w-full text-left text-sm text-on-surface">
