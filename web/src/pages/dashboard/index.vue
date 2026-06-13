@@ -179,7 +179,8 @@
           <p v-else class="empty-state">No recent activity available.</p>
         </section> -->
       </template>
-    </div></PortalShell>
+    </div>
+  </PortalShell>
 </template>
 
 <style scoped>
