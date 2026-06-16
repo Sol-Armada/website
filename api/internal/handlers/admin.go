@@ -23,6 +23,7 @@ type AdminServiceInterface interface {
 	GetTokenLedgerAnalytics(context.Context) (*service.TokenLedgerAnalytics, error)
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 	GetMembersByIds(context.Context, []string) (map[string]service.MemberSummary, error)
+	CreateAttendanceRecord(context.Context, service.CreateAttendanceRecordInput) error
 }
 
 var _ AdminServiceInterface = (*service.AdminService)(nil)
@@ -270,6 +271,38 @@ func (h *AdminHandler) GetAvailableAttendanceNames(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, attendanceNames)
+}
+
+func (h *AdminHandler) CreateAttendanceRecord(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	// get the body
+	req := service.CreateAttendanceRecordInput{}
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("Failed to bind request body", "error", err)
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	if err := h.adminService.CreateAttendanceRecord(c.Request().Context(), req); err != nil {
+		h.logger.Error("Failed to create attendance record", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_creation_failed",
+			Message: "Failed to create attendance record",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"message": "Attendance record created successfully",
+	})
 }
 
 func hasRole(roles []string, role string) bool {

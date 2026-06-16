@@ -297,6 +297,9 @@ func main() {
 	adminAPI.GET("/token-ledger/analytics", adminHandler.GetTokenLedgerAnalytics)
 	adminAPI.GET("/members", adminHandler.GetMembers)
 	adminAPI.GET("/attendance-names", adminHandler.GetAvailableAttendanceNames)
+	adminAPI.POST("/attendance", adminHandler.CreateAttendanceRecord)
+
+	// WebSocket endpoint
 	api.GET("/ws", wsHandler.Handle)
 
 	// Static file serving (SPA with embedded frontend)

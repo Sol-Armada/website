@@ -7,6 +7,9 @@
   import StatePanel from '@/components/ui/StatePanel.vue'
   import { adminService, type AttendanceRecord, type MemberSummary } from '@/services/adminService'
   import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
+  import { useAuthStore } from '@/stores/auth'
+
+  const authStore = useAuthStore()
 
   const loading = ref(true)
   const isRefreshing = ref(false)
@@ -30,6 +33,11 @@
   const memberSearchFocused = ref(false)
   const memberSearchLoading = ref(false)
   const memberSearchResults = ref<MemberSummary[]>([])
+  const selectedManagerIDs = ref<string[]>([])
+  const managerSearch = ref('')
+  const managerSearchFocused = ref(false)
+  const managerSearchLoading = ref(false)
+  const managerSearchResults = ref<MemberSummary[]>([])
   const createFormName = ref('')
   const createFormAllowTokens = ref(false)
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -38,14 +46,27 @@
   let inFlightRequest: Promise<void> | null = null
   let queuedRefreshMode: 'background' | 'blocking' | null = null
   const unsubscribers: Array<() => void> = []
+  const currentUserId = computed(() => authStore.user?.id ?? null)
 
   const filteredMemberResults = computed(() => {
     const selected = new Set(selectedParticipantIDs.value)
     return memberSearchResults.value.filter(member => !selected.has(member.id))
   })
 
+  const filteredManagerResults = computed(() => {
+    const selected = new Set(selectedManagerIDs.value)
+    return managerSearchResults.value.filter(manager => !selected.has(manager.id))
+  })
+
   const selectedParticipants = computed(() => {
     return selectedParticipantIDs.value.map(id => ({
+      id,
+      name: availableMembers.value[id] || id,
+    }))
+  })
+
+  const selectedManagers = computed(() => {
+    return selectedManagerIDs.value.map(id => ({
       id,
       name: availableMembers.value[id] || id,
     }))
@@ -76,6 +97,7 @@
     ]).then(([names, membersResponse]) => {
       availableAttendanceNames.value = names
       memberSearchResults.value = membersResponse.members || []
+      managerSearchResults.value = membersResponse.members || []
       availableMembers.value = memberSearchResults.value.reduce<Record<string, string>>((acc, member) => {
         acc[member.id] = member.username
         return acc
@@ -139,8 +161,30 @@
     void searchMembers('')
   }
 
+  function addManager(member: MemberSummary): void {
+    if (selectedManagerIDs.value.includes(member.id)) {
+      return
+    }
+
+    selectedManagerIDs.value = [...selectedManagerIDs.value, member.id]
+    availableMembers.value = {
+      ...availableMembers.value,
+      [member.id]: member.username,
+    }
+
+    addParticipant(member)
+
+    memberSearch.value = ''
+    void searchMembers('')
+  }
+
   function removeParticipant(memberID: string): void {
     selectedParticipantIDs.value = selectedParticipantIDs.value.filter(id => id !== memberID)
+    selectedManagerIDs.value = selectedManagerIDs.value.filter(id => id !== memberID)
+  }
+
+  function removeManager(memberID: string): void {
+    selectedManagerIDs.value = selectedManagerIDs.value.filter(id => id !== memberID)
   }
 
   function selectEventName(name: string): void {
@@ -158,14 +202,16 @@
     createSuccess.value = null
 
     const name = createFormName.value.trim()
-    const participantIdentifiers = [...selectedParticipantIDs.value]
+    const participantIds = [...selectedParticipantIDs.value]
+    const managerIds = [...selectedManagerIDs.value]
+    const awardTokens = createFormAllowTokens.value
 
     if (name.length === 0) {
       createError.value = 'Event name is required.'
       return
     }
 
-    if (participantIdentifiers.length === 0) {
+    if (participantIds.length === 0) {
       createError.value = 'Select at least one participant.'
       return
     }
@@ -174,7 +220,10 @@
     try {
       await adminService.createAttendanceRecord({
         name,
-        participantIdentifiers,
+        participantIds,
+        managerIds,
+        awardTokens,
+        submittedBy: currentUserId.value || null,
       })
 
       createSuccess.value = 'Attendance record created successfully.'
@@ -584,11 +633,59 @@
             </div>
           </div>
 
+          <label class="mt-1 text-xs font-semibold uppercase tracking-wide text-on-surface-variant" for="attendance-participants">
+            Event Managers
+          </label>
+
+          <div class="attendance-participant-picker">
+            <div v-if="selectedManagers.length > 0" class="attendance-participant-chips mb-1">
+              <button
+                v-for="manager in selectedManagers"
+                :key="manager.id"
+                class="attendance-participant-chip"
+                type="button"
+                @click="removeManager(manager.id)"
+              >
+                <span>{{ manager.name }}</span>
+                <span class="attendance-participant-chip__remove">x</span>
+              </button>
+            </div>
+
+            <input
+              id="attendance-managers"
+              v-model="managerSearch"
+              class="rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+              placeholder="Search members by name..."
+              type="search"
+              @blur="managerSearchFocused = false"
+              @focus="managerSearchFocused = true"
+            >
+
+            <div v-if="managerSearchFocused" class="attendance-member-menu">
+              <p v-if="managerSearchLoading" class="attendance-member-menu__status">Searching members...</p>
+
+              <p v-else-if="filteredManagerResults.length === 0" class="attendance-member-menu__status">
+                No members found.
+              </p>
+
+              <button
+                v-for="manager in filteredManagerResults"
+                v-else
+                :key="manager.id"
+                class="attendance-member-menu__item"
+                type="button"
+                @mousedown.prevent="addManager(manager)"
+              >
+                {{ manager.username }}
+              </button>
+            </div>
+          </div>
+
           <p class="text-xs text-on-surface-variant">
             Search and select members. Click a chip to remove it.
           </p>
 
-          <div class="mt-4 flex items-center justify-between gap-3">
+          <div class="mt-4 inline-flex items-center gap-3">
             <label class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant" for="allow-tokens-switch">
               Award Tokens
             </label>

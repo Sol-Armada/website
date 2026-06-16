@@ -17,13 +17,15 @@ export interface AttendanceRecord {
   recorded: boolean
   successful: boolean
   dateCreated: string
-  tokensAwarded: boolean
+  awardTokens: boolean
 }
 
 export interface CreateAttendanceRecordRequest {
+  submittedBy: string | null
   name: string
-  participantIdentifiers: string[]
-  tokensAwarded?: boolean
+  participantIds: string[]
+  managerIds: string[]
+  awardTokens?: boolean
 }
 
 export interface TokenTransaction {

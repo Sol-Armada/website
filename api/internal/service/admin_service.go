@@ -544,6 +544,70 @@ func (s *AdminService) GetMemberSummaryByID(_ context.Context, memberID string) 
 	return &summary, nil
 }
 
+type CreateAttendanceRecordInput struct {
+	SubmittedBy    string   `json:"submittedBy"`
+	Name           string   `json:"name"`
+	ParticipantIds []string `json:"participantIds"`
+	ManagerIds     []string `json:"managerIds"`
+	AwardTokens    bool     `json:"awardTokens"`
+}
+
+func (s *AdminService) CreateAttendanceRecord(ctx context.Context, input CreateAttendanceRecordInput) error {
+	allMembers := make(map[string]*members.Member)
+	for _, id := range input.ParticipantIds {
+		allMembers[id] = nil
+	}
+	for _, id := range input.ManagerIds {
+		allMembers[id] = nil
+	}
+	if input.SubmittedBy != "" {
+		allMembers[input.SubmittedBy] = nil
+	}
+
+	memberIDs := make([]string, 0, len(allMembers))
+	for id := range allMembers {
+		memberIDs = append(memberIDs, id)
+	}
+
+	membersList, err := members.GetList(memberIDs)
+	if err != nil {
+		return fmt.Errorf("failed to fetch member details: %w", err)
+	}
+
+	for _, m := range membersList {
+		allMembers[m.Id] = m
+	}
+
+	newAttendance, err := attendance.New(input.Name, allMembers[input.SubmittedBy])
+	if err != nil {
+		return fmt.Errorf("failed to create new attendance record: %w", err)
+	}
+
+	for _, participantId := range input.ParticipantIds {
+		if member, ok := allMembers[participantId]; ok && member != nil {
+			err = newAttendance.AddParticipant(member)
+			if err != nil {
+				s.logger.Error("Failed to add participant to attendance record", "memberId", participantId, "error", err)
+			}
+			continue
+		}
+		s.logger.Warn("Participant ID not found in members list", "memberId", participantId)
+	}
+
+	for _, managerId := range input.ManagerIds {
+		if member, ok := allMembers[managerId]; ok && member != nil {
+			err = newAttendance.SetParticipantManager(managerId)
+			if err != nil {
+				s.logger.Error("Failed to add manager to attendance record", "memberId", managerId, "error", err)
+			}
+			continue
+		}
+		s.logger.Warn("Manager ID not found in members list", "memberId", managerId)
+	}
+
+	return nil
+}
+
 func buildTokenBalanceMap(allTokens []tokens.TokenRecord) map[string]int {
 	balances := make(map[string]int)
 	for _, token := range allTokens {
