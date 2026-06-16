@@ -28,14 +28,16 @@ type AdminServiceInterface interface {
 var _ AdminServiceInterface = (*service.AdminService)(nil)
 
 type AdminHandler struct {
-	adminService AdminServiceInterface
-	logger       *slog.Logger
+	adminService  AdminServiceInterface
+	configService *service.ConfigService
+	logger        *slog.Logger
 }
 
-func NewAdminHandler(adminService AdminServiceInterface, logger *slog.Logger) *AdminHandler {
+func NewAdminHandler(adminService AdminServiceInterface, configService *service.ConfigService, logger *slog.Logger) *AdminHandler {
 	return &AdminHandler{
-		adminService: adminService,
-		logger:       logger,
+		adminService:  adminService,
+		configService: configService,
+		logger:        logger,
 	}
 }
 
@@ -247,6 +249,27 @@ func (h *AdminHandler) GetMembers(c echo.Context) error {
 		"page":    page,
 		"limit":   limit,
 	})
+}
+
+func (h *AdminHandler) GetAvailableAttendanceNames(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	attendanceNames, err := h.configService.GetAvailableAttendanceNames()
+	if err != nil {
+		h.logger.Error("Failed to fetch attendance names", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_names_failed",
+			Message: "Failed to fetch attendance names",
+		})
+	}
+
+	return c.JSON(http.StatusOK, attendanceNames)
 }
 
 func hasRole(roles []string, role string) bool {

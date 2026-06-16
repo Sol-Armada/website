@@ -58,63 +58,6 @@ body::before {
 }
 
 /* Scan-line hover effect */
-/* @keyframes scan-line {
-  0% {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-
-  50% {
-    opacity: 1;
-  }
-
-  100% {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-}
-
-.scan-hover {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
-}
-
-.scan-hover::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #E6A82D 0%, #0041FF 50%, transparent 100%);
-  opacity: 0.8;
-  border-radius: 16px 16px 0 0;
-}
-
-.scan-hover::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  background: linear-gradient(180deg, transparent, var(--sa-blue) 50%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.4s cubic-bezier(0.2, 0, 0, 1);
-}
-
-.scan-hover:hover {
-  border-color: var(--sa-gold) !important;
-  box-shadow: 0 0 24px rgba(230, 168, 45, 0.2);
-}
-
-.scan-hover:hover::after {
-  animation: scan-line 0.4s ease-out;
-    opacity: 0.15;
-} */
-
 .scan-hover {
   position: relative;
   overflow: hidden;
