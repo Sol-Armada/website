@@ -1,61 +1,23 @@
 <script setup lang="ts">
-  import { onBeforeUnmount, onMounted, ref } from 'vue'
+  import { storeToRefs } from 'pinia'
+  import { onBeforeUnmount, onMounted } from 'vue'
   import { RouterLink } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatCard from '@/components/ui/StatCard.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
-  import { type AdminOverviewData, adminService } from '@/services/adminService'
-  import { WS_TOPIC_ADMIN_ATTENDANCE, WS_TOPIC_ADMIN_MEMBERS, WS_TOPIC_ADMIN_TOKEN_LEDGER, wsClient } from '@/services/wsClient'
+  import { useOverviewStore } from '@/stores/overview'
 
-  const loading = ref(true)
-  const error = ref<string | null>(null)
-  const overview = ref<AdminOverviewData | null>(null)
-  let refreshTimer: number | null = null
-  const unsubscribers: Array<() => void> = []
-
-  async function loadOverview() {
-    loading.value = true
-    error.value = null
-
-    try {
-      overview.value = await adminService.getOverview()
-    } catch(error_: any) {
-      error.value = error_?.message || 'Failed to load admin overview'
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function scheduleRefresh() {
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-    }
-    refreshTimer = window.setTimeout(() => {
-      refreshTimer = null
-      // loadOverview()
-    }, 400)
-  }
+  const overviewStore = useOverviewStore()
+  const { loading, error, overview } = storeToRefs(overviewStore)
 
   onMounted(async() => {
-    await loadOverview()
-
-    unsubscribers.push(
-      wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, scheduleRefresh),
-      wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh),
-      wsClient.onTopic(WS_TOPIC_ADMIN_TOKEN_LEDGER, scheduleRefresh),
-    )
+    await overviewStore.initialize()
   })
 
   onBeforeUnmount(() => {
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-      refreshTimer = null
-    }
-    for (const unsubscribe of unsubscribers) {
-      unsubscribe()
-    }
+    overviewStore.dispose()
   })
 </script>
 

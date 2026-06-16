@@ -1,51 +1,51 @@
 <script setup lang="ts">
   import { Switch } from '@vuetify/v0'
+  import { storeToRefs } from 'pinia'
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
-  import { adminService, type AttendanceRecord, type MemberSummary } from '@/services/adminService'
-  import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
+  import { adminService, type MemberSummary } from '@/services/adminService'
+  import { useAttendanceStore } from '@/stores/attendance'
   import { useAuthStore } from '@/stores/auth'
 
   const authStore = useAuthStore()
+  const attendanceStore = useAttendanceStore()
+  const {
+    loading,
+    isRefreshing,
+    error,
+    records,
+    search,
+    page,
+    pageInput,
+    hasNextPage,
+    availableAttendanceNames,
+    availableMembers,
+    memberSearchLoading,
+    memberSearchResults,
+    managerSearchLoading,
+    managerSearchResults,
+  } = storeToRefs(attendanceStore)
 
-  const loading = ref(true)
-  const isRefreshing = ref(false)
-  const error = ref<string | null>(null)
-  const records = ref<AttendanceRecord[]>([])
-  const search = ref('')
-  const page = ref(1)
-  const pageInput = ref('1')
-  const limit = ref(25)
-  const hasNextPage = ref(false)
   const isCreateModalOpen = ref(false)
   const creating = ref(false)
   const createError = ref<string | null>(null)
   const createSuccess = ref<string | null>(null)
-  const availableAttendanceNames = ref<string[]>([])
   const eventNameSearch = ref('')
   const eventNameFocused = ref(false)
-  const availableMembers = ref<Record<string, string>>({})
   const selectedParticipantIDs = ref<string[]>([])
   const memberSearch = ref('')
   const memberSearchFocused = ref(false)
-  const memberSearchLoading = ref(false)
-  const memberSearchResults = ref<MemberSummary[]>([])
   const selectedManagerIDs = ref<string[]>([])
   const managerSearch = ref('')
   const managerSearchFocused = ref(false)
-  const managerSearchLoading = ref(false)
-  const managerSearchResults = ref<MemberSummary[]>([])
   const createFormName = ref('')
   const createFormAllowTokens = ref(false)
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
   let memberSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-  let refreshTimer: number | null = null
-  let inFlightRequest: Promise<void> | null = null
-  let queuedRefreshMode: 'background' | 'blocking' | null = null
-  const unsubscribers: Array<() => void> = []
+  let managerSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
   const currentUserId = computed(() => authStore.user?.id ?? null)
 
   const filteredMemberResults = computed(() => {
@@ -87,26 +87,12 @@
     eventNameFocused.value = false
     memberSearch.value = ''
     selectedParticipantIDs.value = []
+    selectedManagerIDs.value = []
     createFormAllowTokens.value = false
   }
 
   function openCreateModal(): void {
-    void Promise.all([
-      adminService.getAvailableAttendanceNames(),
-      adminService.getMembers(100, 1),
-    ]).then(([names, membersResponse]) => {
-      availableAttendanceNames.value = names
-      memberSearchResults.value = membersResponse.members || []
-      managerSearchResults.value = membersResponse.members || []
-      availableMembers.value = memberSearchResults.value.reduce<Record<string, string>>((acc, member) => {
-        acc[member.id] = member.username
-        return acc
-      }, {})
-    }).catch(error_ => {
-      availableAttendanceNames.value = []
-      memberSearchResults.value = []
-      console.error('Failed to fetch modal options:', error_)
-    })
+    void attendanceStore.loadCreateModalOptions()
 
     createError.value = null
     createSuccess.value = null
@@ -123,27 +109,11 @@
   }
 
   async function searchMembers(query: string): Promise<void> {
-    if (query === '') {
-      return
-    }
+    await attendanceStore.searchMembers(query)
+  }
 
-    memberSearchLoading.value = true
-    try {
-      const response = await adminService.getMembers(100, 1, query || undefined)
-      const members = response.members || []
-      memberSearchResults.value = members
-
-      const nextMap = { ...availableMembers.value }
-      for (const member of members) {
-        nextMap[member.id] = member.username
-      }
-      availableMembers.value = nextMap
-    } catch(error_) {
-      memberSearchResults.value = []
-      console.error('Failed to search members:', error_)
-    } finally {
-      memberSearchLoading.value = false
-    }
+  async function searchManagers(query: string): Promise<void> {
+    await attendanceStore.searchManagers(query)
   }
 
   function addParticipant(member: MemberSummary): void {
@@ -174,8 +144,8 @@
 
     addParticipant(member)
 
-    memberSearch.value = ''
-    void searchMembers('')
+    managerSearch.value = ''
+    void searchManagers('')
   }
 
   function removeParticipant(memberID: string): void {
@@ -231,7 +201,7 @@
       resetCreateForm()
 
       if (page.value === 1) {
-        void loadAttendance({ background: true })
+        void attendanceStore.loadAttendance({ background: true })
       } else {
         page.value = 1
       }
@@ -248,69 +218,6 @@
   function handleGlobalKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && isCreateModalOpen.value) {
       closeCreateModal()
-    }
-  }
-
-  function scheduleRefresh() {
-    if (search.value.trim() !== '') {
-      return
-    }
-
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-    }
-    refreshTimer = window.setTimeout(() => {
-      refreshTimer = null
-      void loadAttendance({ background: true })
-    }, 400)
-  }
-
-  async function loadAttendance(options: { background?: boolean } = {}): Promise<void> {
-    const isBackground = options.background === true
-
-    if (inFlightRequest !== null) {
-      queuedRefreshMode = !isBackground || queuedRefreshMode === 'blocking'
-        ? 'blocking'
-        : 'background'
-      await inFlightRequest
-      return
-    }
-
-    if (isBackground) {
-      isRefreshing.value = true
-    } else {
-      loading.value = true
-      error.value = null
-    }
-
-    const request = (async() => {
-      try {
-        const response = await adminService.getAttendance(limit.value, page.value, search.value || undefined)
-        records.value = response.records || []
-        hasNextPage.value = records.value.length === limit.value
-        error.value = null
-      } catch(error_: any) {
-        if (!isBackground || records.value.length === 0) {
-          error.value = error_?.message || 'Failed to load attendance records'
-          hasNextPage.value = false
-        }
-      } finally {
-        if (isBackground) {
-          isRefreshing.value = false
-        } else {
-          loading.value = false
-        }
-      }
-    })()
-
-    inFlightRequest = request
-    await request
-    inFlightRequest = null
-
-    if (queuedRefreshMode !== null) {
-      const nextMode = queuedRefreshMode
-      queuedRefreshMode = null
-      void loadAttendance({ background: nextMode === 'background' })
     }
   }
 
@@ -350,7 +257,7 @@
 
   watch(page, () => {
     pageInput.value = String(page.value)
-    void loadAttendance()
+    void attendanceStore.loadAttendance()
   })
 
   watch(search, () => {
@@ -360,7 +267,7 @@
 
     searchDebounceTimer = setTimeout(() => {
       page.value = 1
-      void loadAttendance({ background: true })
+      void attendanceStore.loadAttendance({ background: true })
     }, 300)
   })
 
@@ -374,13 +281,22 @@
     }, 250)
   })
 
+  watch(managerSearch, value => {
+    if (managerSearchDebounceTimer) {
+      clearTimeout(managerSearchDebounceTimer)
+    }
+
+    managerSearchDebounceTimer = setTimeout(() => {
+      void searchManagers(value.trim())
+    }, 250)
+  })
+
   watch(isCreateModalOpen, value => {
     document.body.style.overflow = value ? 'hidden' : ''
   })
 
   onMounted(async() => {
-    await loadAttendance()
-    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh))
+    await attendanceStore.initialize()
     window.addEventListener('keydown', handleGlobalKeydown)
   })
 
@@ -391,13 +307,10 @@
     if (memberSearchDebounceTimer) {
       clearTimeout(memberSearchDebounceTimer)
     }
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-      refreshTimer = null
+    if (managerSearchDebounceTimer) {
+      clearTimeout(managerSearchDebounceTimer)
     }
-    for (const unsubscribe of unsubscribers) {
-      unsubscribe()
-    }
+    attendanceStore.dispose()
     window.removeEventListener('keydown', handleGlobalKeydown)
     document.body.style.overflow = ''
   })
@@ -448,6 +361,7 @@
             <tr>
               <th class="px-3 py-2">Name</th>
               <th class="px-3 py-2">Participants</th>
+              <th class="px-3 py-2">Award Tokens</th>
               <th class="px-3 py-2">Recorded</th>
               <th class="px-3 py-2">Date</th>
             </tr>
@@ -457,6 +371,7 @@
             <tr v-for="record in records" :key="record.id" class="border-t border-subtle">
               <td class="px-3 py-2">{{ record.name }}</td>
               <td class="px-3 py-2">{{ record.participantCount }}</td>
+              <td class="px-3 py-2">{{ record.awardTokens ? 'Yes' : 'No' }}</td>
               <td class="px-3 py-2">{{ record.recorded ? 'Yes' : 'No' }}</td>
               <td class="px-3 py-2">{{ new Date(record.dateCreated).toLocaleDateString() }}</td>
             </tr>
