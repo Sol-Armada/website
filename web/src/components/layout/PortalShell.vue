@@ -230,7 +230,7 @@
         </button>
 
         <footer class="mt-auto px-2 py-3 text-xs text-on-surface-variant mono-numeric">
-          v{{ portalVersion }}
+          {{ portalVersion }}
         </footer>
       </aside>
     </div>
