@@ -1,57 +1,31 @@
 <script setup lang="ts">
+  import { storeToRefs } from 'pinia'
   import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatCard from '@/components/ui/StatCard.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
-  import {
-    adminService,
-    type TokenLedgerAnalytics,
-    type TokenPeriodAnalytics,
-    type TokenTransaction,
-  } from '@/services/adminService'
-  import { WS_TOPIC_ADMIN_TOKEN_LEDGER, wsClient } from '@/services/wsClient'
+  import type { TokenPeriodAnalytics } from '@/services/adminService'
+  import { useTokenLedgerStore } from '@/stores/tokenLedger'
 
-  const loading = ref(true)
-  const isRefreshing = ref(false)
-  const error = ref<string | null>(null)
-  const transactions = ref<TokenTransaction[]>([])
-  const ledgerSearch = ref('')
-  const page = ref(1)
-  const pageInput = ref('1')
-  const limit = ref(25)
-  const hasNextPage = ref(false)
+  const tokenLedgerStore = useTokenLedgerStore()
+  const {
+    loading,
+    isRefreshing,
+    error,
+    transactions,
+    ledgerSearch,
+    page,
+    pageInput,
+    hasNextPage,
+    analyticsLoading,
+    analyticsRefreshing,
+    analyticsError,
+    analytics,
+  } = storeToRefs(tokenLedgerStore)
 
-  const analyticsLoading = ref(true)
-  const analyticsRefreshing = ref(false)
-  const analyticsError = ref<string | null>(null)
-  const analytics = ref<TokenLedgerAnalytics | null>(null)
-  let refreshTimer: number | null = null
-  let inFlightLedgerRequest: Promise<void> | null = null
-  let queuedLedgerRefreshMode: 'background' | 'blocking' | null = null
-  let inFlightAnalyticsRequest: Promise<void> | null = null
-  let queuedAnalyticsRefreshMode: 'background' | 'blocking' | null = null
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-  const unsubscribers: Array<() => void> = []
-
-  function scheduleRefresh() {
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-    }
-    refreshTimer = window.setTimeout(() => {
-      refreshTimer = null
-      if (ledgerSearch.value.trim() !== '') {
-        void loadAnalytics({ background: true })
-        return
-      }
-
-      void Promise.all([
-        loadTokenLedger({ background: true }),
-        loadAnalytics({ background: true }),
-      ])
-    }, 400)
-  }
 
   function formatTokenAmount(value: number): string {
     return `${value >= 0 ? '+' : '-'}${Math.abs(value)}`
@@ -65,102 +39,6 @@
     const start = new Date(period.windowStart).toLocaleDateString()
     const end = new Date(period.windowEnd).toLocaleDateString()
     return `${start} - ${end}`
-  }
-
-  async function loadAnalytics(options: { background?: boolean } = {}): Promise<void> {
-    const isBackground = options.background === true
-
-    if (inFlightAnalyticsRequest !== null) {
-      queuedAnalyticsRefreshMode = !isBackground || queuedAnalyticsRefreshMode === 'blocking'
-        ? 'blocking'
-        : 'background'
-      await inFlightAnalyticsRequest
-      return
-    }
-
-    if (isBackground) {
-      analyticsRefreshing.value = true
-    } else {
-      analyticsLoading.value = true
-      analyticsError.value = null
-    }
-
-    const request = (async() => {
-      try {
-        analytics.value = await adminService.getTokenLedgerAnalytics()
-        analyticsError.value = null
-      } catch(error_: any) {
-        if (!isBackground || analytics.value === null) {
-          analyticsError.value = error_?.message || 'Failed to load analytics'
-          analytics.value = null
-        }
-      } finally {
-        if (isBackground) {
-          analyticsRefreshing.value = false
-        } else {
-          analyticsLoading.value = false
-        }
-      }
-    })()
-
-    inFlightAnalyticsRequest = request
-    await request
-    inFlightAnalyticsRequest = null
-
-    if (queuedAnalyticsRefreshMode !== null) {
-      const nextMode = queuedAnalyticsRefreshMode
-      queuedAnalyticsRefreshMode = null
-      void loadAnalytics({ background: nextMode === 'background' })
-    }
-  }
-
-  async function loadTokenLedger(options: { background?: boolean } = {}): Promise<void> {
-    const isBackground = options.background === true
-
-    if (inFlightLedgerRequest !== null) {
-      queuedLedgerRefreshMode = !isBackground || queuedLedgerRefreshMode === 'blocking'
-        ? 'blocking'
-        : 'background'
-      await inFlightLedgerRequest
-      return
-    }
-
-    if (isBackground) {
-      isRefreshing.value = true
-    } else {
-      loading.value = true
-      error.value = null
-    }
-
-    const request = (async() => {
-      try {
-        const response = await adminService.getTokenLedger(limit.value, page.value, ledgerSearch.value || undefined)
-        transactions.value = response.records || []
-        hasNextPage.value = transactions.value.length === limit.value
-        error.value = null
-      } catch(error_: any) {
-        if (!isBackground || transactions.value.length === 0) {
-          error.value = error_?.message || 'Failed to load token ledger'
-          hasNextPage.value = false
-        }
-      } finally {
-        if (isBackground) {
-          isRefreshing.value = false
-        } else {
-          loading.value = false
-        }
-      }
-    })()
-
-    inFlightLedgerRequest = request
-    await request
-    inFlightLedgerRequest = null
-
-    if (queuedLedgerRefreshMode !== null) {
-      const nextMode = queuedLedgerRefreshMode
-      queuedLedgerRefreshMode = null
-      void loadTokenLedger({ background: nextMode === 'background' })
-    }
   }
 
   function goToPreviousPage(): void {
@@ -199,7 +77,7 @@
 
   watch(page, () => {
     pageInput.value = String(page.value)
-    void loadTokenLedger()
+    void tokenLedgerStore.loadTokenLedger()
   })
 
   watch(ledgerSearch, () => {
@@ -209,33 +87,26 @@
 
     searchDebounceTimer = setTimeout(() => {
       page.value = 1
-      void loadTokenLedger({ background: true })
+      void tokenLedgerStore.loadTokenLedger({ background: true })
     }, 300)
   })
 
   onMounted(async() => {
-    await Promise.all([loadTokenLedger(), loadAnalytics()])
-    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_TOKEN_LEDGER, scheduleRefresh))
+    await tokenLedgerStore.initialize()
   })
 
   onBeforeUnmount(() => {
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer)
     }
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-      refreshTimer = null
-    }
-    for (const unsubscribe of unsubscribers) {
-      unsubscribe()
-    }
+    tokenLedgerStore.dispose()
   })
 </script>
 
 <template>
   <PortalShell>
     <PageHeader
-      subtitle="Token activity analytics with weekly and monthly earning and spending patterns."
+      subtitle=""
       title="Token Ledger"
     />
 

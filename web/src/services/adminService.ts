@@ -17,6 +17,15 @@ export interface AttendanceRecord {
   recorded: boolean
   successful: boolean
   dateCreated: string
+  awardTokens: boolean
+}
+
+export interface CreateAttendanceRecordRequest {
+  submittedBy: string | null
+  name: string
+  participantIds: string[]
+  managerIds: string[]
+  awardTokens?: boolean
 }
 
 export interface TokenTransaction {
@@ -88,6 +97,17 @@ export const adminService = {
       limit,
       page,
       search,
+    })
+  },
+
+  async getAvailableAttendanceNames(): Promise<string[]> {
+    return requestJson<string[]>('/api/admin/attendance-names')
+  },
+
+  async createAttendanceRecord(payload: CreateAttendanceRecordRequest): Promise<AttendanceRecord> {
+    return requestJson<AttendanceRecord>('/api/admin/attendance', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
 

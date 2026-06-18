@@ -23,19 +23,22 @@ type AdminServiceInterface interface {
 	GetTokenLedgerAnalytics(context.Context) (*service.TokenLedgerAnalytics, error)
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 	GetMembersByIds(context.Context, []string) (map[string]service.MemberSummary, error)
+	CreateAttendanceRecord(context.Context, service.CreateAttendanceRecordInput) error
 }
 
 var _ AdminServiceInterface = (*service.AdminService)(nil)
 
 type AdminHandler struct {
-	adminService AdminServiceInterface
-	logger       *slog.Logger
+	adminService  AdminServiceInterface
+	configService *service.ConfigService
+	logger        *slog.Logger
 }
 
-func NewAdminHandler(adminService AdminServiceInterface, logger *slog.Logger) *AdminHandler {
+func NewAdminHandler(adminService AdminServiceInterface, configService *service.ConfigService, logger *slog.Logger) *AdminHandler {
 	return &AdminHandler{
-		adminService: adminService,
-		logger:       logger,
+		adminService:  adminService,
+		configService: configService,
+		logger:        logger,
 	}
 }
 
@@ -246,6 +249,59 @@ func (h *AdminHandler) GetMembers(c echo.Context) error {
 		"members": result,
 		"page":    page,
 		"limit":   limit,
+	})
+}
+
+func (h *AdminHandler) GetAvailableAttendanceNames(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	attendanceNames, err := h.configService.GetAvailableAttendanceNames()
+	if err != nil {
+		h.logger.Error("Failed to fetch attendance names", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_names_failed",
+			Message: "Failed to fetch attendance names",
+		})
+	}
+
+	return c.JSON(http.StatusOK, attendanceNames)
+}
+
+func (h *AdminHandler) CreateAttendanceRecord(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	// get the body
+	req := service.CreateAttendanceRecordInput{}
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("Failed to bind request body", "error", err)
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	if err := h.adminService.CreateAttendanceRecord(c.Request().Context(), req); err != nil {
+		h.logger.Error("Failed to create attendance record", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_creation_failed",
+			Message: "Failed to create attendance record",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"message": "Attendance record created successfully",
 	})
 }
 

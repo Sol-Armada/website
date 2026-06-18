@@ -134,6 +134,7 @@ func main() {
 	sessionService := service.NewSessionService(sessionStorage, log)
 	memberService := service.NewMemberService(log)
 	adminService := service.NewAdminService(log)
+	configService := service.NewConfigService(log)
 
 	// Wrap admin service with caching if Redis is available
 	var adminServiceInterface handlers.AdminServiceInterface = adminService
@@ -173,7 +174,7 @@ func main() {
 		log,
 	)
 	memberHandler := handlers.NewMemberHandler(memberService, log)
-	adminHandler := handlers.NewAdminHandler(adminServiceInterface, log)
+	adminHandler := handlers.NewAdminHandler(adminServiceInterface, configService, log)
 	wsHub := realtime.NewHub(log)
 	go wsHub.RunHealthHeartbeat(20 * time.Second)
 	wsHandler := handlers.NewWebSocketHandler(wsHub, log)
@@ -287,6 +288,7 @@ func main() {
 	memberAPI := api.Group("/member")
 	memberAPI.GET("/dashboard", memberHandler.GetDashboard)
 	memberAPI.GET("/profile", memberHandler.GetProfile)
+	memberAPI.GET("/token-ledger", memberHandler.GetTokenLedger)
 
 	adminAPI := api.Group("/admin")
 	adminAPI.GET("/overview", adminHandler.GetOverview)
@@ -294,6 +296,10 @@ func main() {
 	adminAPI.GET("/token-ledger", adminHandler.GetTokenLedger)
 	adminAPI.GET("/token-ledger/analytics", adminHandler.GetTokenLedgerAnalytics)
 	adminAPI.GET("/members", adminHandler.GetMembers)
+	adminAPI.GET("/attendance-names", adminHandler.GetAvailableAttendanceNames)
+	adminAPI.POST("/attendance", adminHandler.CreateAttendanceRecord)
+
+	// WebSocket endpoint
 	api.GET("/ws", wsHandler.Handle)
 
 	// Static file serving (SPA with embedded frontend)

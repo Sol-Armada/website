@@ -1,156 +1,26 @@
 <script setup lang="ts">
+  import { storeToRefs } from 'pinia'
   import { onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
-  import { adminService, type MemberSummary } from '@/services/adminService'
-  import { type RealtimeEnvelope, WS_TOPIC_ADMIN_MEMBERS, wsClient } from '@/services/wsClient'
+  import { useMembersStore } from '@/stores/members'
 
-  const loading = ref(true)
-  const isRefreshing = ref(false)
-  const error = ref<string | null>(null)
-  const members = ref<MemberSummary[]>([])
-  const search = ref('')
-  const page = ref(1)
-  const pageInput = ref('1')
-  const limit = ref(25)
-  const hasNextPage = ref(false)
+  const membersStore = useMembersStore()
+  const {
+    loading,
+    isRefreshing,
+    error,
+    members,
+    search,
+    page,
+    pageInput,
+    hasNextPage,
+  } = storeToRefs(membersStore)
 
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-  let refreshTimer: number | null = null
-  let inFlightRequest: Promise<void> | null = null
-  let queuedRefreshMode: 'background' | 'blocking' | null = null
   let nextPageLoadMode: 'background' | 'blocking' = 'blocking'
-  const unsubscribers: Array<() => void> = []
-
-  function scheduleRefresh() {
-    if (search.value.trim() !== '') {
-      return
-    }
-
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-    }
-    refreshTimer = window.setTimeout(() => {
-      refreshTimer = null
-      void loadMembers({ background: true })
-    }, 400)
-  }
-
-  function logRealtimeMemberDecision(decision: string, event: RealtimeEnvelope): void {
-    if (!import.meta.env.DEV) {
-      return
-    }
-
-    const operation = String(event.payload?.operation ?? '').toLowerCase()
-    const memberID = String(event.payload?.member_id ?? event.payload?.primary_key ?? '').trim()
-    console.debug('[members:realtime]', {
-      decision,
-      operation,
-      memberID,
-      page: page.value,
-      pageSize: limit.value,
-      visibleRows: members.value.length,
-      searchActive: search.value.trim() !== '',
-      sequence: event.sequence,
-    })
-  }
-
-  function applyRealtimeMemberEvent(event: RealtimeEnvelope): void {
-    if (search.value.trim() !== '') {
-      logRealtimeMemberDecision('ignored-search-active', event)
-      return
-    }
-
-    const operation = String(event.payload?.operation ?? '').toLowerCase()
-    const memberID = String(event.payload?.member_id ?? event.payload?.primary_key ?? '').trim()
-    const payloadMember = event.payload?.member as MemberSummary | undefined
-
-    if (operation === 'delete' && memberID !== '') {
-      const nextMembers = members.value.filter(member => member.id !== memberID)
-      if (nextMembers.length !== members.value.length) {
-        members.value = nextMembers
-        logRealtimeMemberDecision('patched-delete', event)
-        return
-      }
-      logRealtimeMemberDecision('ignored-delete-not-visible', event)
-      return
-    }
-
-    if (!payloadMember || !payloadMember.id) {
-      logRealtimeMemberDecision('fallback-refresh-missing-member-payload', event)
-      scheduleRefresh()
-      return
-    }
-
-    const existingIndex = members.value.findIndex(member => member.id === payloadMember.id)
-    if (existingIndex !== -1) {
-      const nextMembers = [...members.value]
-      nextMembers[existingIndex] = payloadMember
-      members.value = nextMembers
-      logRealtimeMemberDecision('patched-update-visible-row', event)
-      return
-    }
-
-    if (operation === 'insert' && page.value === 1 && members.value.length < limit.value) {
-      members.value = [payloadMember, ...members.value]
-      logRealtimeMemberDecision('patched-insert-page-1', event)
-      return
-    }
-
-    logRealtimeMemberDecision('fallback-refresh-not-visible', event)
-    scheduleRefresh()
-  }
-
-  async function loadMembers(options: { background?: boolean } = {}): Promise<void> {
-    const isBackground = options.background === true
-
-    if (inFlightRequest !== null) {
-      queuedRefreshMode = !isBackground || queuedRefreshMode === 'blocking'
-        ? 'blocking'
-        : 'background'
-      await inFlightRequest
-      return
-    }
-
-    if (isBackground) {
-      isRefreshing.value = true
-    } else {
-      loading.value = true
-      error.value = null
-    }
-
-    const request = (async() => {
-      try {
-        const response = await adminService.getMembers(limit.value, page.value, search.value || undefined)
-        members.value = response.members || []
-        hasNextPage.value = members.value.length === limit.value
-        error.value = null
-      } catch(error_: any) {
-        if (!isBackground || members.value.length === 0) {
-          error.value = error_?.message || 'Failed to load members'
-          hasNextPage.value = false
-        }
-      } finally {
-        if (isBackground) {
-          isRefreshing.value = false
-        } else {
-          loading.value = false
-        }
-      }
-    })()
-
-    inFlightRequest = request
-    await request
-    inFlightRequest = null
-
-    if (queuedRefreshMode !== null) {
-      const nextMode = queuedRefreshMode
-      queuedRefreshMode = null
-      void loadMembers({ background: nextMode === 'background' })
-    }
-  }
 
   function goToPreviousPage(): void {
     if (page.value <= 1 || loading.value) return
@@ -190,7 +60,7 @@
     pageInput.value = String(page.value)
     const shouldUseBackgroundLoad = nextPageLoadMode === 'background'
     nextPageLoadMode = 'blocking'
-    void loadMembers({ background: shouldUseBackgroundLoad })
+    void membersStore.loadMembers({ background: shouldUseBackgroundLoad })
   })
 
   watch(search, () => {
@@ -204,23 +74,16 @@
         return
       }
 
-      void loadMembers({ background: true })
+      void membersStore.loadMembers({ background: true })
     }, 300)
   })
 
   onMounted(async() => {
-    await loadMembers()
-    unsubscribers.push(wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, applyRealtimeMemberEvent))
+    await membersStore.initialize()
   })
 
   onBeforeUnmount(() => {
-    if (refreshTimer !== null) {
-      window.clearTimeout(refreshTimer)
-      refreshTimer = null
-    }
-    for (const unsubscribe of unsubscribers) {
-      unsubscribe()
-    }
+    membersStore.dispose()
   })
 
   onUnmounted(() => {
@@ -230,21 +93,26 @@
 
 <template>
   <PortalShell>
-    <PageHeader subtitle="Searchable member directory with rank tags and simple paging." title="Members" />
+    <PageHeader subtitle="" title="Members" />
 
-    <DataPanel description="Browse members with search and paging controls." title="Member Directory">
+    <DataPanel description="" title="">
       <input
         v-model="search"
-        class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface mb-2"
+        class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
         placeholder="Search members..."
         type="search"
       >
 
-      <br>
+      <div class="mb-3 mt-2 h-0.5 w-full overflow-hidden rounded-full bg-surface-variant/40">
+        <div
+          class="h-full w-full bg-primary/80 transition-opacity duration-150"
+          :class="isRefreshing && !loading ? 'animate-pulse opacity-100' : 'opacity-0'"
+        />
+      </div>
 
       <StatePanel v-if="error" :message="error" title="Members load failed" tone="error" />
 
-      <div v-else-if="members.length > 0" class="overflow-x-auto rounded-lg border border-subtle">
+      <div v-else-if="members.length > 0" class="overflow-x-auto rounded-lg border border-subtle mt-2">
         <table class="w-full text-left text-sm text-on-surface">
           <thead class="bg-surface-variant/40 text-on-surface-variant">
             <tr>
@@ -266,7 +134,9 @@
         </table>
       </div>
 
-      <p v-else class="text-sm text-on-surface-variant">No members found.</p>
+      <p v-else class="text-sm text-on-surface-variant">
+        {{ search ? 'No members matched your search.' : 'No members found.' }}
+      </p>
 
       <div class="mt-4 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
         <span>Page {{ page }}</span>
