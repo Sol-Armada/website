@@ -34,6 +34,7 @@ type AttendanceRecord struct {
 	ParticipantCount int       `json:"participantCount"`
 	Recorded         bool      `json:"recorded"`
 	Successful       bool      `json:"successful"`
+	AwardTokens      bool      `json:"awardTokens"`
 	DateCreated      time.Time `json:"dateCreated"`
 }
 
@@ -206,6 +207,7 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int, 
 			ParticipantCount: participantCount,
 			Recorded:         att.Recorded,
 			Successful:       att.Successful,
+			AwardTokens:      att.Tokenable,
 			DateCreated:      att.DateCreated,
 		})
 	}
