@@ -32,6 +32,17 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      - name: Verify Node.js version
+        run: |
+          echo "Using Node from .nvmrc:"
+          cat .nvmrc
+          echo "Resolved Node version:"
+          node -v
+          echo "npm version:"
+          npm -v
+          echo "yarn version:"
+          yarn -v
+
       - name: Install frontend dependencies
         working-directory: web
         run: yarn install --frozen-lockfile
