@@ -88,6 +88,7 @@ type MemberSummary struct {
 	Attendance   int    `json:"attendance"`
 	TokenBalance int    `json:"tokenBalance"`
 	RSIHandle    string `json:"rsiHandle,omitempty"`
+	ProfileImage string `json:"profileImage,omitempty"`
 }
 
 type AdminService struct {
@@ -610,6 +611,75 @@ func (s *AdminService) CreateAttendanceRecord(ctx context.Context, input CreateA
 	return nil
 }
 
+func (s *AdminService) GetAttendanceRecord(ctx context.Context, attendanceID string) (*AttendanceRecord, error) {
+	if strings.TrimSpace(attendanceID) == "" {
+		return nil, nil
+	}
+
+	att, err := attendance.Get(attendanceID)
+	if err != nil {
+		if errors.Is(err, attendance.ErrAttendanceNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to fetch attendance record %s: %w", attendanceID, err)
+	}
+
+	submittedBy := ""
+	if att.SubmittedBy != nil {
+		submittedBy = att.SubmittedBy.Name
+	}
+
+	participants, err := att.Participants()
+	participantCount := 0
+	if err == nil {
+		participantCount = len(participants)
+	}
+
+	record := &AttendanceRecord{
+		ID:               att.Id,
+		Name:             att.Name,
+		SubmittedBy:      submittedBy,
+		ParticipantCount: participantCount,
+		Recorded:         att.Recorded,
+		Successful:       att.Successful,
+		AwardTokens:      att.Tokenable,
+		DateCreated:      att.DateCreated,
+	}
+
+	return record, nil
+}
+
+func (s *AdminService) GetMembersByAttendance(ctx context.Context, attendanceID string) ([]MemberSummary, error) {
+	if strings.TrimSpace(attendanceID) == "" {
+		return nil, nil
+	}
+
+	att, err := attendance.Get(attendanceID)
+	if err != nil {
+		if errors.Is(err, attendance.ErrAttendanceNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to fetch attendance record %s: %w", attendanceID, err)
+	}
+
+	participants, err := att.Participants()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch participants for attendance record %s: %w", attendanceID, err)
+	}
+
+	result := make([]MemberSummary, 0, len(participants))
+	for _, p := range participants {
+		if p.Member == nil {
+			continue
+		}
+
+		summary := buildMemberSummary(*p.Member, nil)
+		result = append(result, summary)
+	}
+
+	return result, nil
+}
+
 func buildTokenBalanceMap(allTokens []tokens.TokenRecord) map[string]int {
 	balances := make(map[string]int)
 	for _, token := range allTokens {
@@ -630,11 +700,12 @@ func buildMemberSummary(member members.Member, balances map[string]int) MemberSu
 	}
 
 	summary := MemberSummary{
-		ID:         member.Id,
-		Username:   member.Name,
-		Rank:       member.Rank.String(),
-		Attendance: attendanceCount,
-		RSIHandle:  rsiHandle,
+		ID:           member.Id,
+		Username:     member.Name,
+		Rank:         member.Rank.String(),
+		Attendance:   attendanceCount,
+		RSIHandle:    rsiHandle,
+		ProfileImage: member.Avatar,
 	}
 	if len(balances) > 0 {
 		if tokenBalance, ok := balances[member.Id]; ok {

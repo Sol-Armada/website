@@ -24,6 +24,8 @@ type AdminServiceInterface interface {
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 	GetMembersByIds(context.Context, []string) (map[string]service.MemberSummary, error)
 	CreateAttendanceRecord(context.Context, service.CreateAttendanceRecordInput) error
+	GetAttendanceRecord(context.Context, string) (*service.AttendanceRecord, error)
+	GetMembersByAttendance(context.Context, string) ([]service.MemberSummary, error)
 }
 
 var _ AdminServiceInterface = (*service.AdminService)(nil)
@@ -303,6 +305,71 @@ func (h *AdminHandler) CreateAttendanceRecord(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{
 		"message": "Attendance record created successfully",
 	})
+}
+
+func (h *AdminHandler) GetAttendanceRecord(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	id := c.Param("id")
+	if id == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance record ID is required",
+		})
+	}
+
+	record, err := h.adminService.GetAttendanceRecord(c.Request().Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to fetch attendance record", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_fetch_failed",
+			Message: "Failed to fetch attendance record",
+		})
+	}
+
+	if record == nil {
+		return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error:   "not_found",
+			Message: "Attendance record not found",
+		})
+	}
+
+	return c.JSON(http.StatusOK, record)
+}
+
+func (h *AdminHandler) GetMembersByAttendance(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	attendanceId := c.Param("id")
+	if attendanceId == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance ID is required",
+		})
+	}
+
+	members, err := h.adminService.GetMembersByAttendance(c.Request().Context(), attendanceId)
+	if err != nil {
+		h.logger.Error("Failed to fetch members by attendance", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "members_fetch_failed",
+			Message: "Failed to fetch members for the given attendance",
+		})
+	}
+
+	return c.JSON(http.StatusOK, members)
 }
 
 func hasRole(roles []string, role string) bool {

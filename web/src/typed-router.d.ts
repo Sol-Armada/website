@@ -38,11 +38,18 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/admin/attendance': RouteRecordInfo<
-      '/admin/attendance',
+    '/admin/attendance/': RouteRecordInfo<
+      '/admin/attendance/',
       '/admin/attendance',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/admin/attendance/[id]': RouteRecordInfo<
+      '/admin/attendance/[id]',
+      '/admin/attendance/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
       | never
     >,
     '/admin/members': RouteRecordInfo<
@@ -115,13 +122,21 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
-    'src/pages/admin/attendance.vue': {
+    'src/pages/admin/attendance/index.vue': {
       routes:
-        | '/admin/attendance'
+        | '/admin/attendance/'
       views:
         | never
       pathParamNames:
         | never
+    }
+    'src/pages/admin/attendance/[id].vue': {
+      routes:
+        | '/admin/attendance/[id]'
+      views:
+        | never
+      pathParamNames:
+        | 'id'
     }
     'src/pages/admin/members.vue': {
       routes:

@@ -298,6 +298,8 @@ func main() {
 	adminAPI.GET("/members", adminHandler.GetMembers)
 	adminAPI.GET("/attendance-names", adminHandler.GetAvailableAttendanceNames)
 	adminAPI.POST("/attendance", adminHandler.CreateAttendanceRecord)
+	adminAPI.GET("/attendance/:id", adminHandler.GetAttendanceRecord)
+	adminAPI.GET("/attendance/:id/members", adminHandler.GetMembersByAttendance)
 
 	// WebSocket endpoint
 	api.GET("/ws", wsHandler.Handle)

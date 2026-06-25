@@ -78,6 +78,7 @@ export interface MemberSummary {
   attendance: number
   tokenBalance: number
   rsiHandle?: string
+  profileImage?: string
 }
 
 interface PaginatedResponse<T> {
@@ -98,6 +99,10 @@ export const adminService = {
       page,
       search,
     })
+  },
+
+  async getAttendanceRecord(id: string): Promise<AttendanceRecord> {
+    return requestJson<AttendanceRecord>(`/api/admin/attendance/${id}`)
   },
 
   async getAvailableAttendanceNames(): Promise<string[]> {
@@ -129,5 +134,9 @@ export const adminService = {
       page,
       search,
     })
+  },
+
+  async getMembersByAttendance(attendanceId: string): Promise<MemberSummary[]> {
+    return requestJson<MemberSummary[]>(`/api/admin/attendance/${attendanceId}/members`)
   },
 }
