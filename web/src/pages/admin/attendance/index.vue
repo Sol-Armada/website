@@ -2,6 +2,7 @@
   import { Switch } from '@vuetify/v0'
   import { storeToRefs } from 'pinia'
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import { useRouter } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
@@ -10,6 +11,7 @@
   import { useAttendanceStore } from '@/stores/attendance'
   import { useAuthStore } from '@/stores/auth'
 
+  const router = useRouter()
   const authStore = useAuthStore()
   const attendanceStore = useAttendanceStore()
   const {
@@ -364,6 +366,7 @@
               <th class="px-3 py-2">Award Tokens</th>
               <th class="px-3 py-2">Recorded</th>
               <th class="px-3 py-2">Date</th>
+              <th class="px-3 py-2">Actions</th>
             </tr>
           </thead>
 
@@ -374,7 +377,17 @@
               <td class="px-3 py-2">{{ record.awardTokens ? 'Yes' : 'No' }}</td>
               <td class="px-3 py-2">{{ record.recorded ? 'Yes' : 'No' }}</td>
               <td class="px-3 py-2">{{ new Date(record.dateCreated).toLocaleDateString() }}</td>
-            </tr>
+
+              <td class="px-3 py-2">
+                <button
+                  class="inline-flex items-center gap-1 px-3 py-1 bg-primary text-on-primary rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                  type="button"
+                  @click="router.push(`/admin/attendance/${record.id}`)"
+                >
+                  <i class="mdi mdi-eye" />
+                  View
+                </button>
+              </td></tr>
           </tbody>
         </table>
       </div>
