@@ -95,7 +95,26 @@ func (h *StaticHandler) serveFile(c echo.Context, filePath string) error {
 	// Determine content type
 	contentType := mime.TypeByExtension(path.Ext(filePath))
 	if contentType == "" {
-		contentType = "text/html; charset=utf-8"
+		switch path.Ext(filePath) {
+		case ".js", ".mjs":
+			contentType = "application/javascript"
+		case ".wasm":
+			contentType = "application/wasm"
+		case ".json":
+			contentType = "application/json"
+		case ".css":
+			contentType = "text/css"
+		case ".svg":
+			contentType = "image/svg+xml"
+		case ".woff", ".woff2":
+			contentType = "font/woff2"
+		case ".ttf":
+			contentType = "font/ttf"
+		case ".html":
+			contentType = "text/html; charset=utf-8"
+		default:
+			contentType = "application/octet-stream"
+		}
 	}
 
 	// Set headers
