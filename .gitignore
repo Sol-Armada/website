@@ -3,8 +3,9 @@ node_modules
 /dist
 
 # local env files
-.env.local
+.env.*
 .env.*.local
+website.env
 
 # Log files
 npm-debug.log*
@@ -24,5 +25,4 @@ bin/
 deploy*.sh
 
 **/__debug_bin*
-**/config.*
 logs/

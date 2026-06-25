@@ -1,22 +1,47 @@
-.PHONY: clean build build-web build-server
 
-version := $(shell git describe --tags --abbrev=0)
+.PHONY: clean build build-arm build-web build-server dev-web dev-server dev test test-api test-web
+
+version := $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 hash := $(shell git rev-parse --short HEAD)
 
 clean:
-	@rm -f bin/website
+	@rm -rf bin/
 
 build-web-production:
-	@yarn build
+	cd web && yarn build
 
 build-web-beta:
-	@yarn build-beta
+	cd web && yarn build-beta
 
 build-server: clean
-	cd server && go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/website ./
+	cd api && go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/api ./cmd/server
+
+build-arm: clean
+	cd api && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=${version} -X main.hash=${hash}" -o ../bin/api-arm64 ./cmd/server
 
 build-production: build-web-production build-server
 
 build-beta: build-web-beta build-server
 
 build: build-production
+
+dev-web:
+	cd web && yarn dev
+
+dev-server:
+	cd api && go run ./cmd/server
+
+dev: build-web-production
+	@echo "Starting development environment..."
+	@echo "Frontend: http://localhost:5173"
+	@echo "Backend: http://localhost:8080"
+
+test-api:
+	cd api && go test ./...
+
+test-web:
+	cd web && npm run test:run
+
+test: test-api test-web
+
+

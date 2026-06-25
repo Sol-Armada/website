@@ -1,0 +1,32 @@
+# Binary output
+bin/
+/bin/
+dist/
+
+# Go build cache
+.cache/
+*.o
+*.a
+*.so
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+!config.go

@@ -1,0 +1,19 @@
+[Unit]
+Description=Website Polling Updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/website/website.env
+EnvironmentFile=-/etc/website/updater.env
+ExecStart=/usr/local/bin/website-updater.sh
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/opt /var/lib/website /var/lock
