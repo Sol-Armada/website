@@ -320,9 +320,9 @@
 
 <template>
   <PortalShell>
-    <PageHeader subtitle="" title="Attendance" />
+    <PageHeader subtitle="" title="Attendance Records" />
 
-    <DataPanel description="Search attendance records and create new entries." title="Attendance Records">
+    <DataPanel description="" title="">
       <StatePanel
         v-if="createSuccess"
         class="mb-3"

@@ -2,6 +2,8 @@
   import type { AttendanceRecord, MemberSummary } from '@/services/adminService'
   import { onMounted, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import PortalShell from '@/components/layout/PortalShell.vue'
+  import PageHeader from '@/components/ui/PageHeader.vue'
   import { adminService } from '@/services/adminService'
 
   const route = useRoute()
@@ -60,96 +62,98 @@
 </script>
 
 <template>
-  <div class="attendance-detail">
-    <div v-if="isLoading" class="loading">
-      Loading attendance record...
-    </div>
-
-    <div v-else-if="error" class="error-container">
-      <p>{{ error }}</p>
-    </div>
-
-    <div v-else-if="attendanceRecord" class="record-content">
-      <a class="back-link" href="#" @click.prevent="goBack">
-        ← Back to Attendance Reports
-      </a>
-
-      <div class="page-header">
-        <h1 class="page-title">{{ attendanceRecord.name }}</h1>
+  <PortalShell>
+    <div class="attendance-detail">
+      <div v-if="isLoading" class="loading">
+        Loading attendance record...
       </div>
 
-      <!-- Event Header -->
-      <div class="event-header">
-        <div class="event-meta">
-          <div class="meta-item">
-            <div class="meta-label">Submitted By</div>
-            <div class="meta-value">{{ attendanceRecord.submittedBy }}</div>
-          </div>
+      <div v-else-if="error" class="error-container">
+        <p>{{ error }}</p>
+      </div>
 
-          <div class="meta-item">
-            <div class="meta-label">Total Participants</div>
-            <div class="meta-value">{{ participants.length || attendanceRecord.participantCount }}</div>
-          </div>
+      <div v-else-if="attendanceRecord" class="record-content">
+        <a class="back-link" href="#" @click.prevent="goBack">
+          ← Back to Attendance Reports
+        </a>
 
-          <div class="meta-item">
-            <div class="meta-label">Status</div>
+        <div class="page-header">
+          <h1 class="page-title">{{ attendanceRecord.name }}</h1>
+        </div>
 
-            <div class="meta-value">
-              <span class="status-badge" :class="attendanceRecord.successful ? 'status-recorded' : 'status-pending'">
-                {{ attendanceRecord.recorded ? '✓ Recorded' : '◇ Pending' }}
-              </span>
+        <!-- Event Header -->
+        <div class="event-header">
+          <div class="event-meta">
+            <div class="meta-item">
+              <div class="meta-label">Submitted By</div>
+              <div class="meta-value">{{ attendanceRecord.submittedBy }}</div>
+            </div>
+
+            <div class="meta-item">
+              <div class="meta-label">Total Participants</div>
+              <div class="meta-value">{{ participants.length || attendanceRecord.participantCount }}</div>
+            </div>
+
+            <div class="meta-item">
+              <div class="meta-label">Status</div>
+
+              <div class="meta-value">
+                <span class="status-badge" :class="attendanceRecord.successful ? 'status-recorded' : 'status-pending'">
+                  {{ attendanceRecord.recorded ? '✓ Recorded' : '◇ Pending' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="meta-item">
+              <div class="meta-label">Created</div>
+              <div class="meta-value">{{ formatDate(attendanceRecord.dateCreated) }}</div>
+            </div>
+
+            <div class="meta-item">
+              <div class="meta-label">Award Tokens</div>
+              <div class="meta-value">{{ attendanceRecord.awardTokens ? 'Yes' : 'No' }}</div>
             </div>
           </div>
-
-          <div class="meta-item">
-            <div class="meta-label">Created</div>
-            <div class="meta-value">{{ formatDate(attendanceRecord.dateCreated) }}</div>
-          </div>
-
-          <div class="meta-item">
-            <div class="meta-label">Award Tokens</div>
-            <div class="meta-value">{{ attendanceRecord.awardTokens ? 'Yes' : 'No' }}</div>
-          </div>
-        </div>
 
         <!-- <div class="action-bar">
           <v-btn class="btn btn-primary" disabled>✏️ Edit Record</v-btn>
           <v-btn class="btn btn-secondary" disabled>📊 Export List</v-btn>
           <v-btn class="btn btn-danger" disabled>🗑️ Delete Record</v-btn>
         </div> -->
-      </div>
+        </div>
 
-      <div class="participants-section">
-        <h2 class="section-title">Participants ({{ participants.length || attendanceRecord.participantCount }})</h2>
+        <div class="participants-section">
+          <h2 class="section-title">Participants ({{ participants.length || attendanceRecord.participantCount }})</h2>
 
-        <p v-if="participantsError" class="participants-error">
-          {{ participantsError }}
-        </p>
+          <p v-if="participantsError" class="participants-error">
+            {{ participantsError }}
+          </p>
 
-        <p v-else-if="participants.length === 0" class="participants-empty">
-          No participant list was returned for this attendance record.
-        </p>
+          <p v-else-if="participants.length === 0" class="participants-empty">
+            No participant list was returned for this attendance record.
+          </p>
 
-        <div v-else class="participants-grid">
-          <div v-for="participant in participants" :key="participant.id" class="participant-card">
-            <div class="participant-avatar">
-              <img v-if="participant.profileImage" :alt="participant.username" :src="participant.profileImage">
-              <span v-else>{{ getInitials(participant.username) }}</span>
-            </div>
+          <div v-else class="participants-grid">
+            <div v-for="participant in participants" :key="participant.id" class="participant-card">
+              <div class="participant-avatar">
+                <img v-if="participant.profileImage" :alt="participant.username" :src="participant.profileImage">
+                <span v-else>{{ getInitials(participant.username) }}</span>
+              </div>
 
-            <div class="participant-info">
-              <div class="participant-name">{{ participant.username }}</div>
-              <div class="participant-rank">{{ participant.rank }}</div>
+              <div class="participant-info">
+                <div class="participant-name">{{ participant.username }}</div>
+                <div class="participant-rank">{{ participant.rank }}</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div v-else class="not-found">
-      Attendance record not found
+      <div v-else class="not-found">
+        Attendance record not found
+      </div>
     </div>
-  </div>
+  </PortalShell>
 </template>
 
 <style scoped>
