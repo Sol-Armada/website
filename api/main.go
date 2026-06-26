@@ -35,7 +35,7 @@ import (
 	"github.com/sol-armada/website/internal/storage"
 )
 
-//go:embed dist
+//go:embed all:dist
 var frontendFS embed.FS
 
 var (

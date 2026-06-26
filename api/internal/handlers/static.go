@@ -74,6 +74,12 @@ func (h *StaticHandler) Handle(c echo.Context) error {
 func (h *StaticHandler) serveFile(c echo.Context, filePath string) error {
 	file, err := h.fs.Open(filePath)
 	if err != nil {
+		// For missing assets, return 404 instead of HTML fallback
+		// This prevents module load errors when chunks are missing
+		if strings.HasPrefix(filePath, "assets/") {
+			return c.NoContent(http.StatusNotFound)
+		}
+		
 		// Not found - for SPA, return index.html instead
 		if filePath != "index.html" {
 			return h.serveFile(c, "index.html")
