@@ -175,7 +175,7 @@ func main() {
 	)
 	memberHandler := handlers.NewMemberHandler(memberService, log)
 	adminHandler := handlers.NewAdminHandler(adminServiceInterface, configService, log)
-	wsHub := realtime.NewHub(log)
+	wsHub := realtime.NewHub(log, version)
 	go wsHub.RunHealthHeartbeat(20 * time.Second)
 	wsHandler := handlers.NewWebSocketHandler(wsHub, log)
 

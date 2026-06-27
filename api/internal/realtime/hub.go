@@ -79,14 +79,16 @@ type Hub struct {
 	mu      sync.RWMutex
 	clients map[*Client]struct{}
 
+	version  string
 	sequence int64
 	closed   atomic.Bool
 }
 
-func NewHub(logger *slog.Logger) *Hub {
+func NewHub(logger *slog.Logger, version string) *Hub {
 	return &Hub{
 		logger:  logger,
 		clients: make(map[*Client]struct{}),
+		version: version,
 	}
 }
 
@@ -154,7 +156,8 @@ func (h *Hub) RunHealthHeartbeat(interval time.Duration) {
 		}
 
 		h.Publish(TopicSystemHealth, map[string]any{
-			"status": "ok",
+			"status":  "ok",
+			"version": h.version,
 		})
 
 		<-ticker.C

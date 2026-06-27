@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { computed, onMounted, ref, watch } from 'vue'
+  import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { RouterLink, useRoute, useRouter } from 'vue-router'
   import logo from '@/assets/mqatt0az-logo.png'
   import { WS_TOPIC_ADMIN_ATTENDANCE, WS_TOPIC_ADMIN_MEMBERS, WS_TOPIC_ADMIN_TOKEN_LEDGER, WS_TOPIC_SYSTEM_HEALTH, wsClient } from '@/services/wsClient'
@@ -18,6 +18,16 @@
   const appStore = useAppStore()
   const mobileOpen = ref(false)
   const portalVersion = __APP_VERSION__
+  const serverVersion = ref('')
+  let unsubscribeSystemHealth: (() => void) | null = null
+
+  const isVersionMismatch = computed(() => {
+    const detectedVersion = serverVersion.value.trim()
+    if (!detectedVersion) {
+      return false
+    }
+    return detectedVersion !== portalVersion
+  })
 
   const realtimeBannerVisible = computed(() => {
     return appStore.realtimeState === 'connecting'
@@ -33,6 +43,10 @@
       return 'Server connection lost. Reconnecting...'
     }
     return 'Server cannot be reached right now. Waiting for connection...'
+  })
+
+  const versionBannerText = computed(() => {
+    return `A new version is available (${serverVersion.value}). Refresh to update.`
   })
 
   const memberItems: NavItem[] = [
@@ -82,8 +96,30 @@
     return topics
   }
 
+  function handleSystemHealth(event: { payload?: any }) {
+    const detectedVersion = event.payload?.version
+    if (typeof detectedVersion !== 'string') {
+      return
+    }
+    serverVersion.value = detectedVersion
+  }
+
+  function refreshForLatestVersion() {
+    window.location.reload()
+  }
+
   onMounted(() => {
+    if (!unsubscribeSystemHealth) {
+      unsubscribeSystemHealth = wsClient.onTopic(WS_TOPIC_SYSTEM_HEALTH, handleSystemHealth)
+    }
     wsClient.connect(buildTopics())
+  })
+
+  onUnmounted(() => {
+    if (unsubscribeSystemHealth) {
+      unsubscribeSystemHealth()
+      unsubscribeSystemHealth = null
+    }
   })
 
   watch(
@@ -161,6 +197,23 @@
         class="border-t border-divider bg-surface-variant/50 px-4 py-2 text-sm font-medium text-on-surface"
       >
         {{ realtimeBannerText }}
+      </div>
+
+      <div
+        v-if="isVersionMismatch"
+        class="border-t border-divider bg-primary/10 px-4 py-2"
+      >
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 text-sm sm:px-2">
+          <p class="font-medium text-on-surface">{{ versionBannerText }}</p>
+
+          <button
+            class="rounded-md border border-primary/60 bg-primary/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary hover:bg-primary/25"
+            type="button"
+            @click="refreshForLatestVersion"
+          >
+            Refresh now
+          </button>
+        </div>
       </div>
     </header>
 
