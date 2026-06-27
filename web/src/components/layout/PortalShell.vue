@@ -172,7 +172,7 @@
     <!-- Footer with Version -->
     <footer class="mt-auto border-t border-divider bg-surface/50 py-4">
       <div class="mx-auto max-w-7xl px-4 text-center text-xs text-on-surface-variant mono-numeric sm:px-6 lg:px-8">
-        SOL ARMADA Portal v{{ portalVersion }}
+        SOL ARMADA Portal {{ portalVersion }}
       </div>
     </footer>
 
