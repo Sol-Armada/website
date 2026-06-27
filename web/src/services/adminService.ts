@@ -92,6 +92,7 @@ export interface UpdateAttendanceRecordRequest {
   name: string
   recorded: boolean
   successful: boolean
+  awardTokens: boolean
   participantIds: string[]
   onTimeParticipantIds: string[]
 }

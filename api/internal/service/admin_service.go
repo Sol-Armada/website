@@ -107,6 +107,7 @@ type UpdateAttendanceRecordInput struct {
 	Name                 string   `json:"name"`
 	Recorded             bool     `json:"recorded"`
 	Successful           bool     `json:"successful"`
+	AwardTokens          bool     `json:"awardTokens"`
 	ParticipantIds       []string `json:"participantIds"`
 	OnTimeParticipantIds []string `json:"onTimeParticipantIds"`
 }
@@ -775,6 +776,7 @@ func (s *AdminService) UpdateAttendanceRecord(ctx context.Context, attendanceID 
 
 	att.Recorded = input.Recorded
 	att.Successful = input.Successful
+	att.Tokenable = input.AwardTokens
 	if input.Recorded {
 		att.Status = attendance.AttendanceStatusRecorded
 	} else if att.Status == attendance.AttendanceStatusRecorded {

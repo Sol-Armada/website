@@ -23,6 +23,7 @@
   const name = ref('')
   const recorded = ref(false)
   const successful = ref(false)
+  const awardTokens = ref(false)
   const participants = ref<MemberSummary[]>([])
 
   const memberSearch = ref('')
@@ -175,17 +176,13 @@
       return
     }
 
-    if (successful.value && !recorded.value) {
-      saveError.value = 'Successful attendance must also be marked as recorded.'
-      return
-    }
-
     isSaving.value = true
     try {
       await adminService.updateAttendanceRecord(attendanceId, {
         name: normalizedName,
         recorded: recorded.value,
         successful: successful.value,
+        awardTokens: awardTokens.value,
         participantIds: participants.value.map(participant => participant.id),
         onTimeParticipantIds: participants.value.filter(participant => participant.onTime === true).map(participant => participant.id),
       })
@@ -206,12 +203,6 @@
     memberSearchDebounceTimer = setTimeout(() => {
       void searchMembers(query)
     }, 250)
-  })
-
-  watch(recorded, nextRecorded => {
-    if (!nextRecorded) {
-      successful.value = false
-    }
   })
 
   onMounted(() => {
@@ -267,8 +258,13 @@
               </label>
 
               <label class="field-group checkbox-group">
-                <input v-model="successful" class="checkbox-control" :disabled="!recorded" type="checkbox">
+                <input v-model="successful" class="checkbox-control" type="checkbox">
                 <span>Successful</span>
+              </label>
+
+              <label class="field-group checkbox-group">
+                <input v-model="awardTokens" class="checkbox-control" type="checkbox">
+                <span>Award Tokens</span>
               </label>
             </div>
           </DataPanel>

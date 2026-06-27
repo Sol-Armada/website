@@ -69,6 +69,25 @@
     router.push(`/admin/attendance/${attendanceId}/edit`)
   }
 
+  function toggleAwardTokens() {
+    if (!attendanceId) {
+      return
+    }
+
+    adminService.updateAttendanceRecord(attendanceId, {
+      name: attendanceRecord.value?.name || '',
+      recorded: attendanceRecord.value?.recorded || false,
+      successful: attendanceRecord.value?.successful || false,
+      awardTokens: !(attendanceRecord.value?.awardTokens || false),
+      participantIds: participants.value.map(participant => participant.id),
+      onTimeParticipantIds: participants.value.filter(participant => participant.onTime === true).map(participant => participant.id),
+    }).then(payload => {
+      attendanceRecord.value = payload.record
+    }).catch(error_ => {
+      error.value = error_ instanceof Error ? error_.message : 'Failed to update attendance record'
+    })
+  }
+
   function showOnTimePopover(participantId: string) {
     hoveredParticipantId.value = participantId
   }
@@ -136,6 +155,7 @@
 
           <div class="action-bar">
             <button class="btn btn-primary" type="button" @click="goToEdit">Edit Record</button>
+            <button class="btn btn-primary" type="button" @click="toggleAwardTokens">{{ attendanceRecord.awardTokens ? 'Don\'t Award Tokens' : 'Award Tokens' }}</button>
           </div>
         </div>
 
@@ -166,24 +186,26 @@
                 <div class="participant-name">{{ participant.username }}</div>
                 <div class="participant-rank">{{ participant.rank }}</div>
 
-                <Popover.Root :model-value="hoveredParticipantId === participant.id">
-                  <Popover.Activator
-                    as="span"
-                    class="on-time-icon-wrap"
-                    tabindex="0"
-                    @blur="hideOnTimePopover(participant.id)"
-                    @focus="showOnTimePopover(participant.id)"
-                    @mouseenter="showOnTimePopover(participant.id)"
-                    @mouseleave="hideOnTimePopover(participant.id)"
-                  >
-                    <i v-if="participant.onTime" class="mdi mdi-clock text-green" />
-                    <i v-else class="mdi mdi-clock-outline text-red" />
-                  </Popover.Activator>
+                <div v-if="attendanceRecord.awardTokens">
+                  <Popover.Root :model-value="hoveredParticipantId === participant.id">
+                    <Popover.Activator
+                      as="span"
+                      class="on-time-icon-wrap"
+                      tabindex="0"
+                      @blur="hideOnTimePopover(participant.id)"
+                      @focus="showOnTimePopover(participant.id)"
+                      @mouseenter="showOnTimePopover(participant.id)"
+                      @mouseleave="hideOnTimePopover(participant.id)"
+                    >
+                      <i v-if="participant.onTime" class="mdi mdi-clock text-green" />
+                      <i v-else class="mdi mdi-clock-outline text-red" />
+                    </Popover.Activator>
 
-                  <Popover.Content class="on-time-tooltip" position-area="top center" position-try="flip-block">
-                    {{ participant.onTime ? 'On time' : 'Not on time' }}
-                  </Popover.Content>
-                </Popover.Root>
+                    <Popover.Content class="on-time-tooltip" position-area="top center" position-try="flip-block">
+                      {{ participant.onTime ? 'On time' : 'Not on time' }}
+                    </Popover.Content>
+                  </Popover.Root>
+                </div>
               </div>
             </div>
           </div>
