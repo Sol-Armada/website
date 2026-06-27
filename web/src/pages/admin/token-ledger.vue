@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import type { TokenPeriodAnalytics } from '@/services/adminService'
+  import { Popover } from '@vuetify/v0'
   import { storeToRefs } from 'pinia'
   import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
@@ -6,7 +8,6 @@
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatCard from '@/components/ui/StatCard.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
-  import type { TokenPeriodAnalytics } from '@/services/adminService'
   import { useTokenLedgerStore } from '@/stores/tokenLedger'
 
   const tokenLedgerStore = useTokenLedgerStore()
@@ -26,6 +27,7 @@
   } = storeToRefs(tokenLedgerStore)
 
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  const hoveredTransactionId = ref<string | number | null>(null)
 
   function formatTokenAmount(value: number): string {
     return `${value >= 0 ? '+' : '-'}${Math.abs(value)}`
@@ -73,6 +75,16 @@
     if (!hasNextPage.value || loading.value) return
 
     page.value += 1
+  }
+
+  function showCommentPopover(transactionId: string | number): void {
+    hoveredTransactionId.value = transactionId
+  }
+
+  function hideCommentPopover(transactionId: string | number): void {
+    if (hoveredTransactionId.value === transactionId) {
+      hoveredTransactionId.value = null
+    }
   }
 
   watch(page, () => {
@@ -187,7 +199,6 @@
                 <th class="px-3 py-2">Transactions</th>
                 <th class="px-3 py-2">Net Amount</th>
                 <th class="px-3 py-2">Earnings</th>
-                <th class="px-3 py-2">Spending</th>
               </tr>
             </thead>
 
@@ -201,7 +212,6 @@
                 </td>
 
                 <td class="px-3 py-2 text-success">{{ formatTokenAmount(reason.totalEarnings) }}</td>
-                <td class="px-3 py-2 text-error">{{ formatTokenAmount(-reason.totalSpending) }}</td>
               </tr>
             </tbody>
           </table>
@@ -235,6 +245,7 @@
               <th class="px-3 py-2">Member</th>
               <th class="px-3 py-2">Amount</th>
               <th class="px-3 py-2">Reason</th>
+              <th class="px-3 py-2">Comment</th>
               <th class="px-3 py-2">Event Name</th>
               <th class="px-3 py-2">Date</th>
             </tr>
@@ -249,6 +260,29 @@
               </td>
 
               <td class="px-3 py-2">{{ transaction.reason }}</td>
+
+              <td class="px-3 py-2">
+                <Popover.Root
+                  v-if="transaction.comment && transaction.comment.length > 0"
+                  :model-value="hoveredTransactionId === transaction.id"
+                >
+                  <Popover.Activator
+                    as="span"
+                    class="on-time-icon-wrap"
+                    tabindex="0"
+                    @blur="hideCommentPopover(transaction.id)"
+                    @focus="showCommentPopover(transaction.id)"
+                    @mouseenter="showCommentPopover(transaction.id)"
+                    @mouseleave="hideCommentPopover(transaction.id)"
+                  >
+                    <i class="mdi mdi-comment" />
+                  </Popover.Activator>
+
+                  <Popover.Content class="p-4 rounded-lg bg-surface-variant text-on-surface-variant border max-w-xs" position-area="top center" position-try="flip-block">
+                    {{ transaction.comment }}
+                  </Popover.Content>
+                </Popover.Root>
+              </td>
 
               <td class="px-3 py-2">{{ transaction.attendanceName || '—' }}</td>
 
