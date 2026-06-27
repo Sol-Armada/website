@@ -379,14 +379,25 @@
               <td class="px-3 py-2">{{ new Date(record.dateCreated).toLocaleDateString() }}</td>
 
               <td class="px-3 py-2">
-                <button
-                  class="inline-flex items-center gap-1 px-3 py-1 bg-primary text-on-primary rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
-                  type="button"
-                  @click="router.push(`/admin/attendance/${record.id}`)"
-                >
-                  <i class="mdi mdi-eye" />
-                  View
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="inline-flex items-center gap-1 px-3 py-1 bg-primary text-on-primary rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                    type="button"
+                    @click="router.push(`/admin/attendance/${record.id}`)"
+                  >
+                    <i class="mdi mdi-eye" />
+                    View
+                  </button>
+
+                  <button
+                    class="inline-flex items-center gap-1 rounded-md border border-subtle px-3 py-1 text-sm font-medium text-on-surface transition hover:bg-surface-variant/40"
+                    type="button"
+                    @click="router.push(`/admin/attendance/${record.id}/edit`)"
+                  >
+                    <i class="mdi mdi-pencil" />
+                    Edit
+                  </button>
+                </div>
               </td></tr>
           </tbody>
         </table>

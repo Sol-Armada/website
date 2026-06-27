@@ -299,6 +299,8 @@ func main() {
 	adminAPI.GET("/attendance-names", adminHandler.GetAvailableAttendanceNames)
 	adminAPI.POST("/attendance", adminHandler.CreateAttendanceRecord)
 	adminAPI.GET("/attendance/:id", adminHandler.GetAttendanceRecord)
+	adminAPI.GET("/attendance/:id/edit", adminHandler.GetAttendanceEditPayload)
+	adminAPI.PATCH("/attendance/:id", adminHandler.UpdateAttendanceRecord)
 	adminAPI.GET("/attendance/:id/members", adminHandler.GetMembersByAttendance)
 
 	// WebSocket endpoint

@@ -79,6 +79,21 @@ export interface MemberSummary {
   tokenBalance: number
   rsiHandle?: string
   profileImage?: string
+  onTime?: boolean
+  isManager?: boolean
+}
+
+export interface AttendanceEditPayload {
+  record: AttendanceRecord
+  participants: MemberSummary[]
+}
+
+export interface UpdateAttendanceRecordRequest {
+  name: string
+  recorded: boolean
+  successful: boolean
+  participantIds: string[]
+  onTimeParticipantIds: string[]
 }
 
 interface PaginatedResponse<T> {
@@ -103,6 +118,10 @@ export const adminService = {
 
   async getAttendanceRecord(id: string): Promise<AttendanceRecord> {
     return requestJson<AttendanceRecord>(`/api/admin/attendance/${id}`)
+  },
+
+  async getAttendanceEditPayload(id: string): Promise<AttendanceEditPayload> {
+    return requestJson<AttendanceEditPayload>(`/api/admin/attendance/${id}/edit`)
   },
 
   async getAvailableAttendanceNames(): Promise<string[]> {
@@ -138,5 +157,12 @@ export const adminService = {
 
   async getMembersByAttendance(attendanceId: string): Promise<MemberSummary[]> {
     return requestJson<MemberSummary[]>(`/api/admin/attendance/${attendanceId}/members`)
+  },
+
+  async updateAttendanceRecord(attendanceId: string, payload: UpdateAttendanceRecordRequest): Promise<AttendanceEditPayload> {
+    return requestJson<AttendanceEditPayload>(`/api/admin/attendance/${attendanceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
   },
 }

@@ -3,9 +3,11 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"errors"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"log/slog"
 
@@ -26,6 +28,8 @@ type AdminServiceInterface interface {
 	CreateAttendanceRecord(context.Context, service.CreateAttendanceRecordInput) error
 	GetAttendanceRecord(context.Context, string) (*service.AttendanceRecord, error)
 	GetMembersByAttendance(context.Context, string) ([]service.MemberSummary, error)
+	GetAttendanceEditPayload(context.Context, string) (*service.AttendanceEditPayload, error)
+	UpdateAttendanceRecord(context.Context, string, service.UpdateAttendanceRecordInput) error
 }
 
 var _ AdminServiceInterface = (*service.AdminService)(nil)
@@ -370,6 +374,118 @@ func (h *AdminHandler) GetMembersByAttendance(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, members)
+}
+
+func (h *AdminHandler) GetAttendanceEditPayload(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance record ID is required",
+		})
+	}
+
+	payload, err := h.adminService.GetAttendanceEditPayload(c.Request().Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to fetch attendance edit payload", "attendanceId", id, "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_fetch_failed",
+			Message: "Failed to fetch attendance edit payload",
+		})
+	}
+
+	if payload == nil {
+		return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error:   "not_found",
+			Message: "Attendance record not found",
+		})
+	}
+
+	return c.JSON(http.StatusOK, payload)
+}
+
+func (h *AdminHandler) UpdateAttendanceRecord(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance record ID is required",
+		})
+	}
+
+	req := service.UpdateAttendanceRecordInput{}
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("Failed to bind attendance update request", "attendanceId", id, "error", err)
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	availableNames, err := h.configService.GetAvailableAttendanceNames()
+	if err != nil {
+		h.logger.Error("Failed to fetch available attendance names", "attendanceId", id, "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_names_failed",
+			Message: "Failed to validate attendance name",
+		})
+	}
+
+	if req.Name != "" && !slices.Contains(availableNames, req.Name) {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance name must be selected from the approved list",
+		})
+	}
+
+	if err := h.adminService.UpdateAttendanceRecord(c.Request().Context(), id, req); err != nil {
+		h.logger.Error("Failed to update attendance record", "attendanceId", id, "error", err)
+
+		switch {
+		case errors.Is(err, service.ErrInvalidAttendanceInput):
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: err.Error(),
+			})
+		case errors.Is(err, service.ErrAttendanceRecordNotFound):
+			return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+				Error:   "not_found",
+				Message: "Attendance record not found",
+			})
+		default:
+			return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+				Error:   "attendance_update_failed",
+				Message: "Failed to update attendance record",
+			})
+		}
+	}
+
+	payload, err := h.adminService.GetAttendanceEditPayload(c.Request().Context(), id)
+	if err != nil {
+		h.logger.Error("Failed to reload attendance after update", "attendanceId", id, "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_fetch_failed",
+			Message: "Attendance updated but reloading failed",
+		})
+	}
+
+	return c.JSON(http.StatusOK, payload)
 }
 
 func hasRole(roles []string, role string) bool {

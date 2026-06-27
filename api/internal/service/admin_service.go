@@ -18,6 +18,11 @@ import (
 	"github.com/sol-armada/sol-bot/tokens"
 )
 
+var (
+	ErrAttendanceRecordNotFound = errors.New("attendance record not found")
+	ErrInvalidAttendanceInput   = errors.New("invalid attendance input")
+)
+
 type AdminOverviewStats struct {
 	TotalMembers      int `json:"totalMembers"`
 	TotalEvents       int `json:"totalEvents"`
@@ -89,6 +94,21 @@ type MemberSummary struct {
 	TokenBalance int    `json:"tokenBalance"`
 	RSIHandle    string `json:"rsiHandle,omitempty"`
 	ProfileImage string `json:"profileImage,omitempty"`
+	OnTime       *bool  `json:"onTime,omitempty"`
+	IsManager    *bool  `json:"isManager,omitempty"`
+}
+
+type AttendanceEditPayload struct {
+	Record       AttendanceRecord `json:"record"`
+	Participants []MemberSummary  `json:"participants"`
+}
+
+type UpdateAttendanceRecordInput struct {
+	Name                 string   `json:"name"`
+	Recorded             bool     `json:"recorded"`
+	Successful           bool     `json:"successful"`
+	ParticipantIds       []string `json:"participantIds"`
+	OnTimeParticipantIds []string `json:"onTimeParticipantIds"`
 }
 
 type AdminService struct {
@@ -674,10 +694,184 @@ func (s *AdminService) GetMembersByAttendance(ctx context.Context, attendanceID 
 		}
 
 		summary := buildMemberSummary(*p.Member, nil)
+		onTime := p.JoinedAtStart
+		isManager := p.IsManager
+		summary.OnTime = &onTime
+		summary.IsManager = &isManager
 		result = append(result, summary)
 	}
 
 	return result, nil
+}
+
+func (s *AdminService) GetAttendanceEditPayload(ctx context.Context, attendanceID string) (*AttendanceEditPayload, error) {
+	record, err := s.GetAttendanceRecord(ctx, attendanceID)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, nil
+	}
+
+	participants, err := s.GetMembersByAttendance(ctx, attendanceID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AttendanceEditPayload{
+		Record:       *record,
+		Participants: participants,
+	}, nil
+}
+
+func (s *AdminService) UpdateAttendanceRecord(ctx context.Context, attendanceID string, input UpdateAttendanceRecordInput) error {
+	if strings.TrimSpace(attendanceID) == "" {
+		return fmt.Errorf("%w: attendance ID is required", ErrInvalidAttendanceInput)
+	}
+
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return fmt.Errorf("%w: event name is required", ErrInvalidAttendanceInput)
+	}
+
+	if input.Successful && !input.Recorded {
+		return fmt.Errorf("%w: successful attendance must be recorded", ErrInvalidAttendanceInput)
+	}
+
+	participantIDs := uniqueNonEmptyStrings(input.ParticipantIds)
+	if len(participantIDs) == 0 {
+		return fmt.Errorf("%w: at least one participant is required", ErrInvalidAttendanceInput)
+	}
+
+	onTimeIDs := uniqueNonEmptyStrings(input.OnTimeParticipantIds)
+	onTimeSet := make(map[string]struct{}, len(onTimeIDs))
+	for _, id := range onTimeIDs {
+		onTimeSet[id] = struct{}{}
+	}
+
+	participantSet := make(map[string]struct{}, len(participantIDs))
+	for _, id := range participantIDs {
+		participantSet[id] = struct{}{}
+	}
+
+	for _, id := range onTimeIDs {
+		if _, ok := participantSet[id]; !ok {
+			return fmt.Errorf("%w: on-time participant %s is not in participant list", ErrInvalidAttendanceInput, id)
+		}
+	}
+
+	att, err := attendance.Get(attendanceID)
+	if err != nil {
+		if errors.Is(err, attendance.ErrAttendanceNotFound) {
+			return fmt.Errorf("%w: %s", ErrAttendanceRecordNotFound, attendanceID)
+		}
+
+		return fmt.Errorf("failed to fetch attendance record %s: %w", attendanceID, err)
+	}
+
+	if att.Name != name {
+		att.Name = name
+	}
+
+	att.Recorded = input.Recorded
+	att.Successful = input.Successful
+	if input.Recorded {
+		att.Status = attendance.AttendanceStatusRecorded
+	} else if att.Status == attendance.AttendanceStatusRecorded {
+		att.Status = attendance.AttendanceStatusActive
+	}
+
+	currentParticipants, err := att.Participants()
+	if err != nil {
+		return fmt.Errorf("failed to fetch attendance participants: %w", err)
+	}
+
+	currentByID := make(map[string]*members.Member, len(currentParticipants))
+	for _, participant := range currentParticipants {
+		if participant == nil || participant.Member == nil {
+			continue
+		}
+
+		currentByID[participant.Member.Id] = participant.Member
+	}
+
+	for id, member := range currentByID {
+		if _, keep := participantSet[id]; keep {
+			continue
+		}
+
+		if err := att.RemoveParticipant(member); err != nil {
+			return fmt.Errorf("failed to remove participant %s: %w", id, err)
+		}
+	}
+
+	toAddIDs := make([]string, 0)
+	for _, id := range participantIDs {
+		if _, exists := currentByID[id]; exists {
+			continue
+		}
+
+		toAddIDs = append(toAddIDs, id)
+	}
+
+	if len(toAddIDs) > 0 {
+		memberList, err := members.GetList(toAddIDs)
+		if err != nil {
+			return fmt.Errorf("failed to fetch participants to add: %w", err)
+		}
+
+		membersByID := make(map[string]*members.Member, len(memberList))
+		for _, member := range memberList {
+			if member == nil {
+				continue
+			}
+
+			membersByID[member.Id] = member
+		}
+
+		missingParticipantIDs := make([]string, 0)
+		for _, id := range toAddIDs {
+			member, ok := membersByID[id]
+			if !ok || member == nil {
+				missingParticipantIDs = append(missingParticipantIDs, id)
+				continue
+			}
+
+			if err := att.AddParticipant(member); err != nil {
+				return fmt.Errorf("failed to add participant %s: %w", id, err)
+			}
+		}
+
+		if len(missingParticipantIDs) > 0 {
+			return fmt.Errorf("%w: participant IDs not found: %s", ErrInvalidAttendanceInput, strings.Join(missingParticipantIDs, ", "))
+		}
+	}
+
+	updatedParticipants, err := att.Participants()
+	if err != nil {
+		return fmt.Errorf("failed to fetch updated participants: %w", err)
+	}
+
+	for _, participant := range updatedParticipants {
+		if participant == nil || participant.Member == nil {
+			continue
+		}
+
+		_, shouldBeOnTime := onTimeSet[participant.Member.Id]
+		if participant.JoinedAtStart == shouldBeOnTime {
+			continue
+		}
+
+		if err := participant.SetJoinedAtStart(att.Id, shouldBeOnTime); err != nil {
+			return fmt.Errorf("failed to update on-time flag for participant %s: %w", participant.Member.Id, err)
+		}
+	}
+
+	if err := att.Save(); err != nil {
+		return fmt.Errorf("failed to save attendance record: %w", err)
+	}
+
+	return nil
 }
 
 func buildTokenBalanceMap(allTokens []tokens.TokenRecord) map[string]int {
@@ -784,4 +978,29 @@ func matchesAnyField(search string, fields ...string) bool {
 	}
 
 	return false
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+
+	return result
 }

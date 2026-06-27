@@ -1,9 +1,9 @@
 <script setup lang="ts">
   import type { AttendanceRecord, MemberSummary } from '@/services/adminService'
+  import { Popover } from '@vuetify/v0'
   import { onMounted, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
-  import PageHeader from '@/components/ui/PageHeader.vue'
   import { adminService } from '@/services/adminService'
 
   const route = useRoute()
@@ -16,6 +16,7 @@
   const isLoading = ref(true)
   const error = ref<string | null>(null)
   const participantsError = ref<string | null>(null)
+  const hoveredParticipantId = ref<string | null>(null)
 
   onMounted(async() => {
     try {
@@ -58,6 +59,24 @@
 
   function goBack() {
     router.push('/admin/attendance')
+  }
+
+  function goToEdit() {
+    if (!attendanceId) {
+      return
+    }
+
+    router.push(`/admin/attendance/${attendanceId}/edit`)
+  }
+
+  function showOnTimePopover(participantId: string) {
+    hoveredParticipantId.value = participantId
+  }
+
+  function hideOnTimePopover(participantId: string) {
+    if (hoveredParticipantId.value === participantId) {
+      hoveredParticipantId.value = null
+    }
   }
 </script>
 
@@ -115,11 +134,9 @@
             </div>
           </div>
 
-        <!-- <div class="action-bar">
-          <v-btn class="btn btn-primary" disabled>✏️ Edit Record</v-btn>
-          <v-btn class="btn btn-secondary" disabled>📊 Export List</v-btn>
-          <v-btn class="btn btn-danger" disabled>🗑️ Delete Record</v-btn>
-        </div> -->
+          <div class="action-bar">
+            <button class="btn btn-primary" type="button" @click="goToEdit">Edit Record</button>
+          </div>
         </div>
 
         <div class="participants-section">
@@ -134,7 +151,12 @@
           </p>
 
           <div v-else class="participants-grid">
-            <div v-for="participant in participants" :key="participant.id" class="participant-card">
+            <div
+              v-for="participant in participants"
+              :key="participant.id"
+              class="participant-card"
+              :class="{ 'participant-card-on-time': participant.onTime }"
+            >
               <div class="participant-avatar">
                 <img v-if="participant.profileImage" :alt="participant.username" :src="participant.profileImage">
                 <span v-else>{{ getInitials(participant.username) }}</span>
@@ -143,6 +165,25 @@
               <div class="participant-info">
                 <div class="participant-name">{{ participant.username }}</div>
                 <div class="participant-rank">{{ participant.rank }}</div>
+
+                <Popover.Root :model-value="hoveredParticipantId === participant.id">
+                  <Popover.Activator
+                    as="span"
+                    class="on-time-icon-wrap"
+                    tabindex="0"
+                    @blur="hideOnTimePopover(participant.id)"
+                    @focus="showOnTimePopover(participant.id)"
+                    @mouseenter="showOnTimePopover(participant.id)"
+                    @mouseleave="hideOnTimePopover(participant.id)"
+                  >
+                    <i v-if="participant.onTime" class="mdi mdi-clock text-green" />
+                    <i v-else class="mdi mdi-clock-outline text-red" />
+                  </Popover.Activator>
+
+                  <Popover.Content class="on-time-tooltip" position-area="top center" position-try="flip-block">
+                    {{ participant.onTime ? 'On time' : 'Not on time' }}
+                  </Popover.Content>
+                </Popover.Root>
               </div>
             </div>
           </div>
@@ -434,6 +475,11 @@
   transition: all var(--motion-fast) var(--ease-standard);
 }
 
+.participant-card-on-time {
+  border-color: color-mix(in oklab, #22c55e, var(--border) 50%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #22c55e, transparent 72%);
+}
+
 .participant-card:hover {
   background: color-mix(in srgb, var(--accent) 5%, var(--surface-warm));
   border-color: var(--accent);
@@ -469,6 +515,38 @@
   font-size: var(--text-xs);
   color: var(--muted);
   font-family: monospace;
+}
+
+.on-time-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.on-time-tooltip {
+  z-index: 20;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.on-time-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .info-section {
