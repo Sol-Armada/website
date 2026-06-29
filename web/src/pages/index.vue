@@ -11,6 +11,6 @@
 
 <template>
   <section class="mx-auto mt-12 max-w-lg rounded-xl border border-subtle bg-glass-surface p-6 text-center">
-    <p class="text-sm text-on-surface-variant">Redirecting to dashboard skeleton...</p>
+    <p class="text-sm text-on-surface-variant">Redirecting to dashboard...</p>
   </section>
 </template>
