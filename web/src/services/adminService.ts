@@ -28,6 +28,10 @@ export interface CreateAttendanceRecordRequest {
   awardTokens?: boolean
 }
 
+export interface AttendanceNameMutationRequest {
+  name: string
+}
+
 export interface TokenTransaction {
   id: string
   memberId: string
@@ -137,6 +141,20 @@ export const adminService = {
 
   async getAvailableAttendanceNames(): Promise<string[]> {
     return requestJson<string[]>('/api/admin/attendance-names')
+  },
+
+  async createAttendanceName(payload: AttendanceNameMutationRequest): Promise<{ name: string }> {
+    return requestJson<{ name: string }>('/api/admin/attendance-names', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async deleteAttendanceName(payload: AttendanceNameMutationRequest): Promise<{ name: string }> {
+    return requestJson<{ name: string }>('/api/admin/attendance-names', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    })
   },
 
   async createAttendanceRecord(payload: CreateAttendanceRecordRequest): Promise<AttendanceRecord> {

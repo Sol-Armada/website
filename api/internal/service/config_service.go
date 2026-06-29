@@ -20,3 +20,11 @@ func NewConfigService(logger *slog.Logger) *ConfigService {
 func (s *ConfigService) GetAvailableAttendanceNames() ([]string, error) {
 	return config.GetAttendanceNames()
 }
+
+func (s *ConfigService) CreateAttendanceName(name string) error {
+	return config.NewAttendanceName(name)
+}
+
+func (s *ConfigService) DeleteAttendanceName(name string) error {
+	return config.RemoveAttendanceName(name)
+}

@@ -298,6 +298,8 @@ func main() {
 	adminAPI.GET("/token-ledger/analytics", adminHandler.GetTokenLedgerAnalytics)
 	adminAPI.GET("/members", adminHandler.GetMembers)
 	adminAPI.GET("/attendance-names", adminHandler.GetAvailableAttendanceNames)
+	adminAPI.POST("/attendance-names", adminHandler.CreateAttendanceName)
+	adminAPI.DELETE("/attendance-names", adminHandler.DeleteAttendanceName)
 	adminAPI.POST("/attendance", adminHandler.CreateAttendanceRecord)
 	adminAPI.GET("/attendance/:id", adminHandler.GetAttendanceRecord)
 	adminAPI.GET("/attendance/:id/edit", adminHandler.GetAttendanceEditPayload)

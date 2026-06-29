@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { Switch } from '@vuetify/v0'
+  import { Button, Switch } from '@vuetify/v0'
   import { storeToRefs } from 'pinia'
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
@@ -35,6 +35,7 @@
   } = storeToRefs(attendanceStore)
 
   const isCreateModalOpen = ref(false)
+  const isManageNamesModalOpen = ref(false)
   const creating = ref(false)
   const createError = ref<string | null>(null)
   const createSuccess = ref<string | null>(null)
@@ -48,6 +49,11 @@
   const managerSearchFocused = ref(false)
   const createFormName = ref('')
   const createFormAllowTokens = ref(false)
+  const attendanceNameBusy = ref(false)
+  const deletingAttendanceName = ref<string | null>(null)
+  const attendanceNameError = ref<string | null>(null)
+  const manageNameInput = ref('')
+  const manageNameSearch = ref('')
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
   let memberSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
   let managerSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -86,10 +92,22 @@
     return availableAttendanceNames.value.filter(name => name.toLowerCase().includes(query))
   })
 
+  const filteredManageAttendanceNames = computed(() => {
+    const query = manageNameSearch.value.trim().toLowerCase()
+    if (query === '') {
+      return availableAttendanceNames.value
+    }
+
+    return availableAttendanceNames.value.filter(name => name.toLowerCase().includes(query))
+  })
+
+  const isAnyModalOpen = computed(() => isCreateModalOpen.value || isManageNamesModalOpen.value)
+
   function resetCreateForm(): void {
     createFormName.value = ''
     eventNameSearch.value = ''
     eventNameFocused.value = false
+    attendanceNameError.value = null
     memberSearch.value = ''
     selectedParticipantIDs.value = []
     selectedManagerIDs.value = []
@@ -102,6 +120,32 @@
     createError.value = null
     createSuccess.value = null
     isCreateModalOpen.value = true
+  }
+
+  async function refreshAttendanceNames(): Promise<void> {
+    const names = await adminService.getAvailableAttendanceNames()
+    availableAttendanceNames.value = names
+  }
+
+  function openManageNamesModal(): void {
+    attendanceNameError.value = null
+    manageNameInput.value = ''
+    manageNameSearch.value = ''
+    isManageNamesModalOpen.value = true
+    void refreshAttendanceNames().catch(error_ => {
+      attendanceNameError.value = (error_ as { message?: string })?.message || 'Failed to load attendance names'
+    })
+  }
+
+  function closeManageNamesModal(): void {
+    if (attendanceNameBusy.value || deletingAttendanceName.value !== null) {
+      return
+    }
+
+    isManageNamesModalOpen.value = false
+    attendanceNameError.value = null
+    manageNameInput.value = ''
+    manageNameSearch.value = ''
   }
 
   function closeCreateModal(): void {
@@ -220,7 +264,78 @@
     }
   }
 
+  function upsertAttendanceNames(nextName: string): void {
+    const nextSet = new Set(availableAttendanceNames.value)
+    nextSet.add(nextName)
+
+    const orderedNames: string[] = []
+    for (const name of nextSet) {
+      const insertAt = orderedNames.findIndex(existing => name.localeCompare(existing) < 0)
+      if (insertAt === -1) {
+        orderedNames.push(name)
+      } else {
+        orderedNames.splice(insertAt, 0, name)
+      }
+    }
+
+    availableAttendanceNames.value = orderedNames
+  }
+
+  async function createAttendanceName(): Promise<void> {
+    if (attendanceNameBusy.value) {
+      return
+    }
+
+    const name = manageNameInput.value.trim()
+    if (name.length === 0) {
+      attendanceNameError.value = 'Attendance name is required.'
+      return
+    }
+
+    attendanceNameBusy.value = true
+    attendanceNameError.value = null
+    try {
+      await adminService.createAttendanceName({ name })
+      upsertAttendanceNames(name)
+      manageNameInput.value = ''
+    } catch(error_: any) {
+      attendanceNameError.value = error_?.message || 'Failed to create attendance name'
+    } finally {
+      attendanceNameBusy.value = false
+    }
+  }
+
+  async function deleteAttendanceName(name: string): Promise<void> {
+    if (attendanceNameBusy.value || deletingAttendanceName.value !== null) {
+      return
+    }
+
+    deletingAttendanceName.value = name
+    attendanceNameError.value = null
+    try {
+      await adminService.deleteAttendanceName({ name })
+      availableAttendanceNames.value = availableAttendanceNames.value.filter(item => item !== name)
+
+      if (createFormName.value === name) {
+        createFormName.value = ''
+      }
+
+      if (eventNameSearch.value.trim() === name) {
+        eventNameSearch.value = ''
+      }
+    } catch(error_: any) {
+      attendanceNameError.value = error_?.message || 'Failed to delete attendance name'
+    } finally {
+      deletingAttendanceName.value = null
+    }
+  }
+
   function handleGlobalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && isManageNamesModalOpen.value) {
+      closeManageNamesModal()
+      return
+    }
+
     if (event.key === 'Escape' && isCreateModalOpen.value) {
       closeCreateModal()
     }
@@ -296,7 +411,7 @@
     }, 250)
   })
 
-  watch(isCreateModalOpen, value => {
+  watch(isAnyModalOpen, value => {
     document.body.style.overflow = value ? 'hidden' : ''
   })
 
@@ -371,6 +486,14 @@
           placeholder="Search attendance..."
           type="search"
         >
+
+        <button
+          class="shrink-0 rounded-md border border-subtle px-4 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-variant/40"
+          type="button"
+          @click="openManageNamesModal"
+        >
+          Manage Event Names
+        </button>
 
         <button
           class="shrink-0 rounded-md border border-primary bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -695,6 +818,113 @@
         </form>
       </div>
     </div>
+
+    <div
+      v-if="isManageNamesModalOpen"
+      class="attendance-modal-overlay"
+      role="presentation"
+      @click.self="closeManageNamesModal"
+    >
+      <div class="attendance-modal-panel attendance-modal-panel--narrow">
+        <div class="attendance-modal-header">
+          <div>
+            <h2 class="text-lg font-semibold text-on-surface">Manage Event Names</h2>
+            <p class="mt-1 text-sm text-on-surface-variant">Create new attendance names or remove existing ones.</p>
+          </div>
+
+          <button
+            aria-label="Close attendance name modal"
+            class="rounded-md p-2 text-on-surface-variant transition hover:bg-surface-variant/40 hover:text-on-surface"
+            type="button"
+            @click="closeManageNamesModal"
+          >
+            x
+          </button>
+        </div>
+
+        <div class="attendance-modal-body">
+          <StatePanel
+            v-if="attendanceNameError"
+            class="mb-2"
+            :message="attendanceNameError"
+            title="Unable To Update Event Names"
+            tone="error"
+          />
+
+          <label class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant" for="attendance-name-create">
+            New Event Name
+          </label>
+
+          <div class="attendance-name-create-row">
+            <input
+              id="attendance-name-create"
+              v-model="manageNameInput"
+              class="rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+              placeholder="Type event name"
+              type="text"
+              @keydown.enter.prevent="createAttendanceName"
+            >
+
+            <button
+              class="attendance-event-actions__add bg-primary text-on-primary rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="attendanceNameBusy || manageNameInput.trim().length === 0"
+              type="button"
+              @click="createAttendanceName"
+            >
+              {{ attendanceNameBusy ? 'Adding...' : 'Add' }}
+            </button>
+          </div>
+
+          <label class="text-xs font-semibold uppercase tracking-wide text-on-surface-variant" for="attendance-name-search">
+            Existing Names
+          </label>
+
+          <input
+            id="attendance-name-search"
+            v-model="manageNameSearch"
+            class="rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"
+            placeholder="Filter names"
+            type="search"
+          >
+
+          <div class="attendance-name-list">
+            <p v-if="filteredManageAttendanceNames.length === 0" class="attendance-event-menu__status">
+              No event names found.
+            </p>
+
+            <div
+              v-for="name in filteredManageAttendanceNames"
+              v-else
+              :key="name"
+              class="attendance-event-menu__row"
+            >
+              <span class="attendance-name-list__name">{{ name }}</span>
+
+              <Button.Root
+                aria-label="Delete attendance name"
+                class="px-2 py-1 mr-4 bg-error text-on-primary rounded-md text-sm font-medium hover:opacity-90 transition-opacity"
+                :disabled="deletingAttendanceName === name || attendanceNameBusy"
+                type="button"
+                @click="deleteAttendanceName(name)"
+              >
+                {{ deletingAttendanceName === name ? '...' : 'Delete' }}
+              </Button.Root>
+            </div>
+          </div>
+
+          <div class="mt-2 flex items-center justify-end gap-2">
+            <button
+              class="rounded-md border border-subtle px-4 py-2 text-sm text-on-surface transition hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="attendanceNameBusy || deletingAttendanceName !== null"
+              type="button"
+              @click="closeManageNamesModal"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </PortalShell>
 </template>
 
@@ -720,6 +950,10 @@
     box-shadow: 0 24px 72px rgb(0 0 0 / 0.45);
     overflow: visible;
     position: relative;
+  }
+
+  .attendance-modal-panel--narrow {
+    max-width: 34rem;
   }
 
   .attendance-modal-header {
@@ -759,6 +993,81 @@
     box-shadow: 0 14px 30px rgb(0 0 0 / 0.3);
   }
 
+  .attendance-event-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .attendance-name-create-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .attendance-name-list {
+    max-height: 20rem;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--v0-divider) 70%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--v0-surface) 92%, transparent);
+  }
+
+  .attendance-name-list__name {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--v0-on-surface);
+  }
+
+  /* .attendance-name-list__delete {
+    flex: 0 0 auto;
+    border: 1px solid color-mix(in srgb, var(--v0-danger) 45%, transparent);
+    background: color-mix(in srgb, var(--v0-danger) 10%, transparent);
+    color: var(--v0-danger);
+    border-radius: 0.375rem;
+    min-width: 4.8rem;
+    margin-right: 0.5rem;
+    padding: 0.28rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .attendance-name-list__delete:hover {
+    background: color-mix(in srgb, var(--v0-danger) 16%, transparent);
+  }
+
+  .attendance-name-list__delete:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  } */
+
+  /* .attendance-event-actions__add {
+    border: 1px solid color-mix(in srgb, var(--v0-primary) 65%, transparent);
+    background: color-mix(in srgb, var(--v0-primary) 14%, transparent);
+    color: var(--v0-on-surface);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: background-color 150ms ease;
+  }
+
+  .attendance-event-actions__add:hover {
+    background: color-mix(in srgb, var(--v0-primary) 22%, transparent);
+  }
+
+  .attendance-event-actions__add:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  } */
+
+  .attendance-event-menu__row {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
   .attendance-event-menu__item,
   .attendance-event-menu__status {
     width: 100%;
@@ -775,6 +1084,27 @@
 
   .attendance-event-menu__item:hover {
     background: color-mix(in srgb, var(--v0-primary) 12%, transparent);
+  }
+
+  .attendance-event-menu__delete {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    color: var(--v0-on-surface-variant);
+    border-radius: 0.375rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    line-height: 1;
+  }
+
+  .attendance-event-menu__delete:hover {
+    background: color-mix(in srgb, var(--v0-danger) 16%, transparent);
+    color: var(--v0-danger);
+  }
+
+  .attendance-event-menu__delete:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
 
   .attendance-participant-picker {

@@ -301,6 +301,106 @@ func (h *AdminHandler) GetAvailableAttendanceNames(c echo.Context) error {
 	return c.JSON(http.StatusOK, attendanceNames)
 }
 
+func (h *AdminHandler) CreateAttendanceName(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("Failed to bind create attendance name request", "error", err)
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance name is required",
+		})
+	}
+
+	if err := h.configService.CreateAttendanceName(name); err != nil {
+		h.logger.Error("Failed to create attendance name", "name", name, "error", err)
+		if strings.Contains(strings.ToLower(err.Error()), "exist") {
+			return c.JSON(http.StatusConflict, dto.ErrorResponse{
+				Error:   "attendance_name_exists",
+				Message: "Attendance name already exists",
+			})
+		}
+
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_name_create_failed",
+			Message: "Failed to create attendance name",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"message": "Attendance name created successfully",
+		"name":    name,
+	})
+}
+
+func (h *AdminHandler) DeleteAttendanceName(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		h.logger.Error("Failed to bind delete attendance name request", "error", err)
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Attendance name is required",
+		})
+	}
+
+	if err := h.configService.DeleteAttendanceName(name); err != nil {
+		h.logger.Error("Failed to delete attendance name", "name", name, "error", err)
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+				Error:   "attendance_name_not_found",
+				Message: "Attendance name not found",
+			})
+		}
+
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_name_delete_failed",
+			Message: "Failed to delete attendance name",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"message": "Attendance name deleted successfully",
+		"name":    name,
+	})
+}
+
 func (h *AdminHandler) CreateAttendanceRecord(c echo.Context) error {
 	roles, _ := c.Get("roles").([]string)
 	if !hasRole(roles, "admin") {
