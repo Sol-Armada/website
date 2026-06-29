@@ -71,6 +71,16 @@ export interface TokenLedgerAnalytics {
   reasons: TokenReasonAggregation[]
 }
 
+export interface AttendanceAnalytics {
+  windowStart: string
+  windowEnd: string
+  uniqueAttendeesLast30Days: number
+  inactiveMembersLast30Days: number
+  mostPopularEventLast30Days: string
+  mostPopularEventAttendanceLast30Days: number
+  totalEventsLast30Days: number
+}
+
 export interface MemberSummary {
   id: string
   username: string
@@ -146,6 +156,10 @@ export const adminService = {
 
   async getTokenLedgerAnalytics(): Promise<TokenLedgerAnalytics> {
     return requestJson<TokenLedgerAnalytics>('/api/admin/token-ledger/analytics')
+  },
+
+  async getAttendanceAnalytics(): Promise<AttendanceAnalytics> {
+    return requestJson<AttendanceAnalytics>('/api/admin/attendance/analytics')
   },
 
   async getMembers(limit = 50, page = 1, search?: string): Promise<PaginatedResponse<MemberSummary>> {

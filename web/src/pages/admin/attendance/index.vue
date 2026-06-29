@@ -6,6 +6,7 @@
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
+  import StatCard from '@/components/ui/StatCard.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
   import { adminService, type MemberSummary } from '@/services/adminService'
   import { useAttendanceStore } from '@/stores/attendance'
@@ -23,6 +24,10 @@
     page,
     pageInput,
     hasNextPage,
+    analyticsLoading,
+    analyticsRefreshing,
+    analyticsError,
+    attendanceAnalytics,
     availableAttendanceNames,
     availableMembers,
     memberSearchLoading,
@@ -82,6 +87,12 @@
 
     return availableAttendanceNames.value.filter(name => name.toLowerCase().includes(query))
   })
+
+  function formatAnalyticsWindowLabel(start: string, end: string): string {
+    const startLabel = new Date(start).toLocaleDateString()
+    const endLabel = new Date(end).toLocaleDateString()
+    return `${startLabel} - ${endLabel}`
+  }
 
   function resetCreateForm(): void {
     createFormName.value = ''
@@ -321,6 +332,39 @@
 <template>
   <PortalShell>
     <PageHeader subtitle="" title="Attendance Records" />
+
+    <DataPanel description="" title="Analytics">
+      <p
+        v-if="analyticsRefreshing && !analyticsLoading"
+        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant"
+      >
+        Refreshing analytics...
+      </p>
+
+      <StatePanel v-if="analyticsLoading" message="Loading attendance analytics..." title="Please wait" />
+
+      <StatePanel v-else-if="analyticsError" :message="analyticsError" title="Analytics load failed" tone="error" />
+
+      <div v-else-if="attendanceAnalytics" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          :detail="formatAnalyticsWindowLabel(attendanceAnalytics.windowStart, attendanceAnalytics.windowEnd)"
+          label="Unique Attendees (30 Days)"
+          :value="attendanceAnalytics.uniqueAttendeesLast30Days"
+        />
+
+        <StatCard
+          :detail="formatAnalyticsWindowLabel(attendanceAnalytics.windowStart, attendanceAnalytics.windowEnd)"
+          label="No Attendance (30 Days)"
+          :value="attendanceAnalytics.inactiveMembersLast30Days"
+        />
+
+        <StatCard
+          :detail="`${attendanceAnalytics.mostPopularEventAttendanceLast30Days} total attendees across ${attendanceAnalytics.totalEventsLast30Days} events`"
+          label="Most Popular Event (30 Days)"
+          :value="attendanceAnalytics.mostPopularEventLast30Days"
+        />
+      </div>
+    </DataPanel>
 
     <DataPanel description="" title="">
       <StatePanel

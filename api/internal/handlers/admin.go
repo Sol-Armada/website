@@ -23,6 +23,7 @@ type AdminServiceInterface interface {
 	GetAttendanceRecords(context.Context, int, int, string) ([]service.AttendanceRecord, error)
 	GetTokenLedger(context.Context, int, int, string) ([]service.TokenTransaction, error)
 	GetTokenLedgerAnalytics(context.Context) (*service.TokenLedgerAnalytics, error)
+	GetAttendanceAnalytics(context.Context) (*service.AttendanceAnalytics, error)
 	GetMembers(context.Context, int, int, string) ([]service.MemberSummary, error)
 	GetMembersByIds(context.Context, []string) (map[string]service.MemberSummary, error)
 	CreateAttendanceRecord(context.Context, service.CreateAttendanceRecordInput) error
@@ -211,6 +212,27 @@ func (h *AdminHandler) GetTokenLedgerAnalytics(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "token_analytics_failed",
 			Message: "Failed to fetch token ledger analytics",
+		})
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *AdminHandler) GetAttendanceAnalytics(c echo.Context) error {
+	roles, _ := c.Get("roles").([]string)
+	if !hasRole(roles, "admin") {
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   "forbidden",
+			Message: "Admin access required",
+		})
+	}
+
+	result, err := h.adminService.GetAttendanceAnalytics(c.Request().Context())
+	if err != nil {
+		h.logger.Error("Failed to fetch attendance analytics", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "attendance_analytics_failed",
+			Message: "Failed to fetch attendance analytics",
 		})
 	}
 

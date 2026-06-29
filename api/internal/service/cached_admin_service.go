@@ -73,6 +73,27 @@ func (cas *CachedAdminService) GetTokenLedgerAnalytics(ctx context.Context) (*To
 	return stats, nil
 }
 
+func (cas *CachedAdminService) GetAttendanceAnalytics(ctx context.Context) (*AttendanceAnalytics, error) {
+	key := cache.CacheKey{Prefix: cache.KeyAdminAttendanceAnalytics}.String()
+
+	var stats *AttendanceAnalytics
+	if err := cas.cache.GetJSON(ctx, key, &stats); err == nil {
+		cas.logger.Debug("Cache hit for attendance analytics", "key", key)
+		return stats, nil
+	}
+
+	stats, err := cas.AdminService.GetAttendanceAnalytics(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cas.cache.Set(ctx, key, stats, cas.ttl); err != nil {
+		cas.logger.Warn("Failed to cache attendance analytics", "error", err)
+	}
+
+	return stats, nil
+}
+
 // InvalidateOverviewCache clears the overview cache
 func (cas *CachedAdminService) InvalidateOverviewCache(ctx context.Context) error {
 	key := cache.CacheKey{Prefix: cache.KeyAdminOverview}.String()
@@ -85,6 +106,7 @@ func (cas *CachedAdminService) InvalidateAllCaches(ctx context.Context) error {
 		cache.CacheKey{Prefix: cache.KeyAdminOverview}.String(),
 		cache.CacheKey{Prefix: cache.KeyAttendanceList}.String(),
 		cache.CacheKey{Prefix: cache.KeyAdminTokenAnalytics}.String(),
+		cache.CacheKey{Prefix: cache.KeyAdminAttendanceAnalytics}.String(),
 	}
 	return cas.cache.Del(ctx, keys...)
 }

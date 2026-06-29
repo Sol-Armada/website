@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { storeToRefs } from 'pinia'
-  import { onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+  import { onBeforeUnmount, onMounted, onUnmounted, watch } from 'vue'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
@@ -95,7 +95,7 @@
   <PortalShell>
     <PageHeader subtitle="" title="Members" />
 
-    <DataPanel description="" title="">
+    <DataPanel description="Review member stats, attendance count, and current token balances." title="Member Directory">
       <input
         v-model="search"
         class="w-full rounded-md border border-subtle bg-transparent px-3 py-2 text-sm text-on-surface"

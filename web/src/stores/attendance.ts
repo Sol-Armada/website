@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { adminService, type AttendanceRecord, type MemberSummary } from '@/services/adminService'
-import { WS_TOPIC_ADMIN_ATTENDANCE, wsClient } from '@/services/wsClient'
+import { adminService, type AttendanceAnalytics, type AttendanceRecord, type MemberSummary } from '@/services/adminService'
+import { WS_TOPIC_ADMIN_ATTENDANCE, WS_TOPIC_ADMIN_MEMBERS, wsClient } from '@/services/wsClient'
 import { createRefreshScheduler } from '@/stores/refreshScheduler'
 import { createRequestQueue } from '@/stores/requestQueue'
 
@@ -16,6 +16,11 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const limit = ref(25)
   const hasNextPage = ref(false)
 
+  const analyticsLoading = ref(true)
+  const analyticsRefreshing = ref(false)
+  const analyticsError = ref<string | null>(null)
+  const attendanceAnalytics = ref<AttendanceAnalytics | null>(null)
+
   const availableAttendanceNames = ref<string[]>([])
   const availableMembers = ref<Record<string, string>>({})
   const memberSearchLoading = ref(false)
@@ -25,7 +30,9 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   const refreshScheduler = createRefreshScheduler()
   const attendanceRequestQueue = createRequestQueue()
+  const analyticsRequestQueue = createRequestQueue()
   let unsubscribeAttendance: (() => void) | null = null
+  let unsubscribeMembers: (() => void) | null = null
 
   async function loadAttendance(options: { background?: boolean } = {}): Promise<void> {
     await attendanceRequestQueue.run(options, async isBackground => {
@@ -57,12 +64,43 @@ export const useAttendanceStore = defineStore('attendance', () => {
   }
 
   function scheduleRefresh(): void {
-    if (search.value.trim() !== '') {
-      return
-    }
-
     refreshScheduler.schedule(() => {
-      void loadAttendance({ background: true })
+      if (search.value.trim() !== '') {
+        void loadAttendanceAnalytics({ background: true })
+        return
+      }
+
+      void Promise.all([
+        loadAttendance({ background: true }),
+        loadAttendanceAnalytics({ background: true }),
+      ])
+    })
+  }
+
+  async function loadAttendanceAnalytics(options: { background?: boolean } = {}): Promise<void> {
+    await analyticsRequestQueue.run(options, async isBackground => {
+      if (isBackground) {
+        analyticsRefreshing.value = true
+      } else {
+        analyticsLoading.value = true
+        analyticsError.value = null
+      }
+
+      try {
+        attendanceAnalytics.value = await adminService.getAttendanceAnalytics()
+        analyticsError.value = null
+      } catch(error_: any) {
+        if (!isBackground || attendanceAnalytics.value === null) {
+          analyticsError.value = error_?.message || 'Failed to load attendance analytics'
+          attendanceAnalytics.value = null
+        }
+      } finally {
+        if (isBackground) {
+          analyticsRefreshing.value = false
+        } else {
+          analyticsLoading.value = false
+        }
+      }
     })
   }
 
@@ -71,17 +109,27 @@ export const useAttendanceStore = defineStore('attendance', () => {
       unsubscribeAttendance = wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh)
     }
 
-    await loadAttendance()
+    if (unsubscribeMembers === null) {
+      unsubscribeMembers = wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, scheduleRefresh)
+    }
+
+    await Promise.all([loadAttendance(), loadAttendanceAnalytics()])
   }
 
   function dispose(): void {
     refreshScheduler.clear()
 
     attendanceRequestQueue.clear()
+    analyticsRequestQueue.clear()
 
     if (unsubscribeAttendance !== null) {
       unsubscribeAttendance()
       unsubscribeAttendance = null
+    }
+
+    if (unsubscribeMembers !== null) {
+      unsubscribeMembers()
+      unsubscribeMembers = null
     }
   }
 
@@ -165,6 +213,10 @@ export const useAttendanceStore = defineStore('attendance', () => {
     pageInput,
     limit,
     hasNextPage,
+    analyticsLoading,
+    analyticsRefreshing,
+    analyticsError,
+    attendanceAnalytics,
     availableAttendanceNames,
     availableMembers,
     memberSearchLoading,
@@ -172,6 +224,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     managerSearchLoading,
     managerSearchResults,
     loadAttendance,
+    loadAttendanceAnalytics,
     scheduleRefresh,
     initialize,
     dispose,

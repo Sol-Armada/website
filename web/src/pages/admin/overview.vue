@@ -39,15 +39,15 @@
 
     <template v-else-if="overview">
       <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Current total" label="Total Members" :value="overview.totalMembers" />
-        <StatCard detail="Tracked events" label="Events" :value="overview.totalEvents" />
-        <StatCard detail="Total issued" label="Tokens" :value="overview.totalTokens" />
-        <StatCard detail="Active this month" label="Active Members" :value="overview.activeThisMonth" />
+        <StatCard :color-border="true" detail="Current total" label="Total Members" :value="overview.totalMembers" />
+        <StatCard :color-border="true" detail="Tracked events" label="Events" :value="overview.totalEvents" />
+        <StatCard :color-border="true" detail="Total issued" label="Tokens" :value="overview.totalTokens" />
+        <StatCard :color-border="true" detail="Active this month" label="Active Members" :value="overview.activeThisMonth" />
       </section>
 
       <section class="mt-6 grid gap-4 lg:grid-cols-2">
-        <StatCard detail="Unique participants in tracked events" label="Unique Attendees" :value="overview.uniqueAttendees" />
-        <StatCard detail="Average attendees per tracked event" label="Average Attendance" :value="overview.averageAttendance" />
+        <StatCard :color-border="true" detail="Unique participants in tracked events" label="Unique Attendees" :value="overview.uniqueAttendees" />
+        <StatCard :color-border="true" detail="Average attendees per tracked event" label="Average Attendance" :value="overview.averageAttendance" />
       </section>
 
       <!-- <section class="tactical-panel mt-6 p-5">

@@ -158,6 +158,13 @@ body::before {
   border-radius: 16px 16px 0 0;
 }
 
+.panel {
+  position: relative;
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  border-radius: 16px;
+}
+
 /* Badge styles */
 .badge-gold {
   display: inline-flex;

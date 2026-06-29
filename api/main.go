@@ -293,6 +293,7 @@ func main() {
 	adminAPI := api.Group("/admin")
 	adminAPI.GET("/overview", adminHandler.GetOverview)
 	adminAPI.GET("/attendance", adminHandler.GetAttendance)
+	adminAPI.GET("/attendance/analytics", adminHandler.GetAttendanceAnalytics)
 	adminAPI.GET("/token-ledger", adminHandler.GetTokenLedger)
 	adminAPI.GET("/token-ledger/analytics", adminHandler.GetTokenLedgerAnalytics)
 	adminAPI.GET("/members", adminHandler.GetMembers)

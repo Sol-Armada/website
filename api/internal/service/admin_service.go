@@ -86,6 +86,16 @@ type TokenLedgerAnalytics struct {
 	Reasons []TokenReasonAggregation `json:"reasons"`
 }
 
+type AttendanceAnalytics struct {
+	WindowStart                       time.Time `json:"windowStart"`
+	WindowEnd                         time.Time `json:"windowEnd"`
+	UniqueAttendeesLast30Days         int       `json:"uniqueAttendeesLast30Days"`
+	InactiveMembersLast30Days         int       `json:"inactiveMembersLast30Days"`
+	MostPopularEventLast30Days        string    `json:"mostPopularEventLast30Days"`
+	MostPopularEventAttendanceLast30D int       `json:"mostPopularEventAttendanceLast30Days"`
+	TotalEventsLast30Days             int       `json:"totalEventsLast30Days"`
+}
+
 type MemberSummary struct {
 	ID           string `json:"id"`
 	Username     string `json:"username"`
@@ -369,6 +379,95 @@ func (s *AdminService) GetTokenLedgerAnalytics(_ context.Context) (*TokenLedgerA
 		Week:    calculateTokenPeriodAnalytics(allTokens, weekStart, now),
 		Month:   calculateTokenPeriodAnalytics(allTokens, monthStart, now),
 		Reasons: calculateReasonAggregation(allTokens),
+	}, nil
+}
+
+func (s *AdminService) GetAttendanceAnalytics(_ context.Context) (*AttendanceAnalytics, error) {
+	allAttendance, err := attendance.List(10000, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch attendance records for analytics: %w", err)
+	}
+
+	memberIDs, err := members.GetStoredMemberIDs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch member IDs for attendance analytics: %w", err)
+	}
+
+	now := time.Now().UTC()
+	windowStart := now.AddDate(0, 0, -30)
+
+	attendeeIDs := make(map[string]struct{})
+	eventTotals := make(map[string]int)
+	bestEventName := ""
+	bestEventCount := 0
+	totalEvents := 0
+
+	for _, att := range allAttendance {
+		createdAt := att.DateCreated.UTC()
+		if createdAt.Before(windowStart) || createdAt.After(now) {
+			continue
+		}
+
+		totalEvents += 1
+
+		participants, err := att.Participants()
+		if err != nil {
+			continue
+		}
+
+		participantCount := 0
+		for _, participant := range participants {
+			if participant == nil || participant.Member == nil || strings.TrimSpace(participant.Member.Id) == "" {
+				continue
+			}
+
+			attendeeIDs[participant.Member.Id] = struct{}{}
+			participantCount += 1
+		}
+
+		eventName := strings.TrimSpace(att.Name)
+		if eventName == "" {
+			eventName = "Unnamed Event"
+		}
+
+		eventTotals[eventName] += participantCount
+		if eventTotals[eventName] > bestEventCount || (eventTotals[eventName] == bestEventCount && eventName < bestEventName) {
+			bestEventCount = eventTotals[eventName]
+			bestEventName = eventName
+		}
+	}
+
+	uniqueMemberIDs := make(map[string]struct{}, len(memberIDs))
+	for _, memberID := range memberIDs {
+		trimmed := strings.TrimSpace(memberID)
+		if trimmed == "" {
+			continue
+		}
+
+		uniqueMemberIDs[trimmed] = struct{}{}
+	}
+
+	inactiveMembers := 0
+	for memberID := range uniqueMemberIDs {
+		if _, attended := attendeeIDs[memberID]; attended {
+			continue
+		}
+
+		inactiveMembers += 1
+	}
+
+	if bestEventName == "" {
+		bestEventName = "No events in last 30 days"
+	}
+
+	return &AttendanceAnalytics{
+		WindowStart:                       windowStart,
+		WindowEnd:                         now,
+		UniqueAttendeesLast30Days:         len(attendeeIDs),
+		InactiveMembersLast30Days:         inactiveMembers,
+		MostPopularEventLast30Days:        bestEventName,
+		MostPopularEventAttendanceLast30D: bestEventCount,
+		TotalEventsLast30Days:             totalEvents,
 	}, nil
 }
 
