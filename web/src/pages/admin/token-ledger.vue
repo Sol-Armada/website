@@ -122,7 +122,7 @@
       title="Token Ledger"
     />
 
-    <DataPanel description="Backend-aggregated statistics from the full token ledger." title="Ledger Analytics">
+    <DataPanel description="Backend-aggregated statistics from the full token ledger." title="Analytics">
       <p
         v-if="analyticsRefreshing && !analyticsLoading"
         class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant"
