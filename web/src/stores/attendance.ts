@@ -17,7 +17,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const hasNextPage = ref(false)
 
   const analyticsLoading = ref(true)
-  const analyticsRefreshing = ref(false)
   const analyticsError = ref<string | null>(null)
   const attendanceAnalytics = ref<AttendanceAnalytics | null>(null)
 
@@ -78,28 +77,20 @@ export const useAttendanceStore = defineStore('attendance', () => {
   }
 
   async function loadAttendanceAnalytics(options: { background?: boolean } = {}): Promise<void> {
-    await analyticsRequestQueue.run(options, async isBackground => {
-      if (isBackground) {
-        analyticsRefreshing.value = true
-      } else {
-        analyticsLoading.value = true
-        analyticsError.value = null
-      }
+    await analyticsRequestQueue.run(options, async() => {
+      analyticsLoading.value = true
+      analyticsError.value = null
 
       try {
         attendanceAnalytics.value = await adminService.getAttendanceAnalytics()
         analyticsError.value = null
       } catch(error_: any) {
-        if (!isBackground || attendanceAnalytics.value === null) {
+        if (attendanceAnalytics.value === null) {
           analyticsError.value = error_?.message || 'Failed to load attendance analytics'
           attendanceAnalytics.value = null
         }
       } finally {
-        if (isBackground) {
-          analyticsRefreshing.value = false
-        } else {
-          analyticsLoading.value = false
-        }
+        analyticsLoading.value = false
       }
     })
   }
@@ -214,7 +205,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
     limit,
     hasNextPage,
     analyticsLoading,
-    analyticsRefreshing,
     analyticsError,
     attendanceAnalytics,
     availableAttendanceNames,

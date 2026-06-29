@@ -25,7 +25,6 @@
     pageInput,
     hasNextPage,
     analyticsLoading,
-    analyticsRefreshing,
     analyticsError,
     attendanceAnalytics,
     availableAttendanceNames,
@@ -328,12 +327,6 @@
     <PageHeader subtitle="" title="Attendance Records" />
 
     <DataPanel description="" title="Analytics">
-      <p
-        v-if="analyticsRefreshing && !analyticsLoading"
-        class="mb-3 text-xs font-medium uppercase tracking-wide text-on-surface-variant"
-      >
-        Refreshing analytics...
-      </p>
 
       <StatePanel v-if="analyticsLoading" message="Loading attendance analytics..." title="Please wait" />
 
