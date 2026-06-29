@@ -347,15 +347,18 @@
 
       <div v-else-if="attendanceAnalytics" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <StatCard
-          :detail="formatAnalyticsWindowLabel(attendanceAnalytics.windowStart, attendanceAnalytics.windowEnd)"
+          :detail="
+            attendanceAnalytics &&
+              attendanceAnalytics.uniqueAttendeesLast30Days + attendanceAnalytics.inactiveMembersLast30Days > 0
+              ? `${(
+                attendanceAnalytics.uniqueAttendeesLast30Days /
+                (attendanceAnalytics.uniqueAttendeesLast30Days + attendanceAnalytics.inactiveMembersLast30Days) *
+                100
+              ).toFixed(1)}%` + ' of members attended in the last 30 days'
+              : '0%'
+          "
           label="Unique Attendees (30 Days)"
           :value="attendanceAnalytics.uniqueAttendeesLast30Days"
-        />
-
-        <StatCard
-          :detail="formatAnalyticsWindowLabel(attendanceAnalytics.windowStart, attendanceAnalytics.windowEnd)"
-          label="No Attendance (30 Days)"
-          :value="attendanceAnalytics.inactiveMembersLast30Days"
         />
 
         <StatCard
