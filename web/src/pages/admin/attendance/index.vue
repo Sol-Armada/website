@@ -88,12 +88,6 @@
     return availableAttendanceNames.value.filter(name => name.toLowerCase().includes(query))
   })
 
-  function formatAnalyticsWindowLabel(start: string, end: string): string {
-    const startLabel = new Date(start).toLocaleDateString()
-    const endLabel = new Date(end).toLocaleDateString()
-    return `${startLabel} - ${endLabel}`
-  }
-
   function resetCreateForm(): void {
     createFormName.value = ''
     eventNameSearch.value = ''

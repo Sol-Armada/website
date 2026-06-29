@@ -1,9 +1,7 @@
 <script setup lang="ts">
   import { storeToRefs } from 'pinia'
   import { onBeforeUnmount, onMounted } from 'vue'
-  import { RouterLink } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
-  import DataPanel from '@/components/ui/DataPanel.vue'
   import PageHeader from '@/components/ui/PageHeader.vue'
   import StatCard from '@/components/ui/StatCard.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
