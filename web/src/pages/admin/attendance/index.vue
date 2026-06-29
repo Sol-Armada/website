@@ -17,7 +17,6 @@
   const attendanceStore = useAttendanceStore()
   const {
     loading,
-    isRefreshing,
     error,
     records,
     search,
@@ -385,7 +384,7 @@
       <div class="mb-3 mt-2 h-0.5 w-full overflow-hidden rounded-full bg-surface-variant/40">
         <div
           class="h-full w-full bg-primary/80 transition-opacity duration-150"
-          :class="isRefreshing && !loading ? 'animate-pulse opacity-100' : 'opacity-0'"
+          :class="!loading ? 'animate-pulse opacity-100' : 'opacity-0'"
         />
       </div>
 

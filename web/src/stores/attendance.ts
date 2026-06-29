@@ -7,7 +7,6 @@ import { createRequestQueue } from '@/stores/requestQueue'
 
 export const useAttendanceStore = defineStore('attendance', () => {
   const loading = ref(true)
-  const isRefreshing = ref(false)
   const error = ref<string | null>(null)
   const records = ref<AttendanceRecord[]>([])
   const search = ref('')
@@ -34,13 +33,9 @@ export const useAttendanceStore = defineStore('attendance', () => {
   let unsubscribeMembers: (() => void) | null = null
 
   async function loadAttendance(options: { background?: boolean } = {}): Promise<void> {
-    await attendanceRequestQueue.run(options, async isBackground => {
-      if (isBackground) {
-        isRefreshing.value = true
-      } else {
-        loading.value = true
-        error.value = null
-      }
+    await attendanceRequestQueue.run(options, async() => {
+      loading.value = true
+      error.value = null
 
       try {
         const response = await adminService.getAttendance(limit.value, page.value, search.value || undefined)
@@ -48,16 +43,12 @@ export const useAttendanceStore = defineStore('attendance', () => {
         hasNextPage.value = records.value.length === limit.value
         error.value = null
       } catch(error_: any) {
-        if (!isBackground || records.value.length === 0) {
+        if (records.value.length === 0) {
           error.value = error_?.message || 'Failed to load attendance records'
           hasNextPage.value = false
         }
       } finally {
-        if (isBackground) {
-          isRefreshing.value = false
-        } else {
-          loading.value = false
-        }
+        loading.value = false
       }
     })
   }
@@ -188,7 +179,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
 
   return {
     loading,
-    isRefreshing,
     error,
     records,
     search,
