@@ -62,20 +62,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
     })
   }
 
-  function scheduleRefresh(): void {
-    refreshScheduler.schedule(() => {
-      if (search.value.trim() !== '') {
-        void loadAttendanceAnalytics({ background: true })
-        return
-      }
-
-      void Promise.all([
-        loadAttendance({ background: true }),
-        loadAttendanceAnalytics({ background: true }),
-      ])
-    })
-  }
-
   async function loadAttendanceAnalytics(options: { background?: boolean } = {}): Promise<void> {
     await analyticsRequestQueue.run(options, async() => {
       analyticsLoading.value = true
@@ -96,14 +82,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
   }
 
   async function initialize(): Promise<void> {
-    if (unsubscribeAttendance === null) {
-      unsubscribeAttendance = wsClient.onTopic(WS_TOPIC_ADMIN_ATTENDANCE, scheduleRefresh)
-    }
-
-    if (unsubscribeMembers === null) {
-      unsubscribeMembers = wsClient.onTopic(WS_TOPIC_ADMIN_MEMBERS, scheduleRefresh)
-    }
-
     await Promise.all([loadAttendance(), loadAttendanceAnalytics()])
   }
 
@@ -215,7 +193,6 @@ export const useAttendanceStore = defineStore('attendance', () => {
     managerSearchResults,
     loadAttendance,
     loadAttendanceAnalytics,
-    scheduleRefresh,
     initialize,
     dispose,
     loadCreateModalOptions,
