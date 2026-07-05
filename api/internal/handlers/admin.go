@@ -152,7 +152,7 @@ func (h *AdminHandler) CreateProject(c echo.Context) error {
 	// Parse optional due date
 	var dueAt *time.Time
 	if req.DueAt != nil && *req.DueAt != "" {
-		parsed, err := time.Parse(time.RFC3339, *req.DueAt)
+		parsed, err := time.Parse("2006-01-02", *req.DueAt)
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 				Error:   "invalid_date",
