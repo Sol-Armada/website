@@ -53,18 +53,39 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
   return `${urlPath}?${serialized}`
 }
 
+function getCsrfToken(): string | null {
+  const cookies = document.cookie.split('; ')
+  const csrfCookie = cookies.find(row => row.startsWith('sa_csrf='))
+  return csrfCookie ? csrfCookie.split('=')[1] : null
+}
+
+function requiresCsrfToken(method: string): boolean {
+  return ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method.toUpperCase())
+}
+
 export async function requestJson<T>(
   path: string,
   init?: RequestInit,
   params?: Record<string, string | number | undefined>,
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...init?.headers,
+  }
+
+  // Add CSRF token for state-changing requests
+  const method = init?.method || 'GET'
+  if (requiresCsrfToken(method)) {
+    const csrfToken = getCsrfToken()
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
+  }
+
   const response = await fetch(buildUrl(path, params), {
     ...init,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
   })
 
   if (!response.ok) {
@@ -75,13 +96,24 @@ export async function requestJson<T>(
 }
 
 export async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...init?.headers,
+  }
+
+  // Add CSRF token for state-changing requests
+  const method = init?.method || 'GET'
+  if (requiresCsrfToken(method)) {
+    const csrfToken = getCsrfToken()
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
+  }
+
   const response = await fetch(path, {
     ...init,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
   })
 
   if (!response.ok) {

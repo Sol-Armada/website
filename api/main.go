@@ -251,7 +251,40 @@ func main() {
 	e.Use(appMiddleware.LoggingMiddleware(log))
 	e.Use(appMiddleware.ErrorLoggerMiddleware(log))
 	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+
+	// Security headers middleware
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Response().Header().Set("X-Frame-Options", "DENY")
+			c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+			c.Response().Header().Set("X-XSS-Protection", "1; mode=block")
+			c.Response().Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			if cfg.Server.Environment == "production" {
+				c.Response().Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			return next(c)
+		}
+	})
+
+	// CORS configuration with explicit allowlist
+	allowedOrigins := []string{cfg.Server.FrontendURL}
+	if cfg.Server.Environment != "production" {
+		// Allow localhost variants in development
+		allowedOrigins = append(allowedOrigins,
+			"http://localhost:5173",
+			"http://localhost:3000",
+			"http://127.0.0.1:5173",
+			"http://127.0.0.1:3000",
+		)
+	}
+
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+		AllowHeaders:     []string{"Content-Type", "Authorization", "X-CSRF-Token"},
+		AllowCredentials: true,
+		MaxAge:           3600,
+	}))
 
 	// Database optimization
 	if solbotClient != nil && solbotClient.Pool != nil {
@@ -278,8 +311,10 @@ func main() {
 		})
 	})
 
-	// Auth routes
+	// Auth routes with stricter rate limiting
+	authRateLimiter := appMiddleware.NewRateLimiter(5, 10)
 	authGroup := e.Group("/auth")
+	authGroup.Use(authRateLimiter.Middleware())
 	authGroup.GET("/login", authHandler.Login)
 	authGroup.GET("/callback", authHandler.Callback)
 	authGroup.POST("/logout", authHandler.Logout, authMiddleware.RequireAuth)

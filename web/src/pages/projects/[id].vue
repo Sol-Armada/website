@@ -1207,7 +1207,7 @@
 
   .btn-primary {
     background: var(--sa-gold);
-    color: #06101d;
+    color: var(--sa-bg);
     border: none;
     padding: 0.75rem 1.25rem;
     border-radius: 10px;
@@ -1483,7 +1483,7 @@
     justify-content: center;
     font-size: 0.58rem;
     font-weight: 700;
-    color: #06101d;
+    color: var(--sa-bg);
   }
 
   .due-date,

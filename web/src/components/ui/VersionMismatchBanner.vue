@@ -41,20 +41,21 @@
 
 <template>
   <Snackbar.Portal>
-    <Snackbar.Root v-if="snackbarOpen" :id="snackbarId" :key="snackbarId" class="fixed bottom-4 right-4 z-50 max-w-md rounded-lg bg-primary/95 px-6 py-4 shadow-lg">
-      <div class="flex items-center justify-between gap-4 text-white">
+    <Snackbar.Root v-if="snackbarOpen" :id="snackbarId" :key="snackbarId" class="fixed bottom-4 right-4 z-50 max-w-md rounded-lg px-6 py-4 shadow-lg" style="background: rgba(230, 168, 45, 0.95);">
+      <div class="flex items-center justify-between gap-4" style="color: var(--sa-bg);">
         <Snackbar.Content>{{ versionMessage }}</Snackbar.Content>
 
         <div class="flex items-center gap-2">
           <button
-            class="rounded px-3 py-1 text-sm font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+            class="rounded px-3 py-1 text-sm font-semibold transition-colors"
+            style="background: rgba(9, 11, 18, 0.2); color: var(--sa-bg);"
             type="button"
             @click="refreshForLatestVersion"
           >
             Refresh
           </button>
 
-          <Snackbar.Close class="text-white hover:text-white/80" />
+          <Snackbar.Close style="color: var(--sa-bg); opacity: 0.9;" />
         </div>
       </div>
     </Snackbar.Root>

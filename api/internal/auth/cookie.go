@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"time"
 
@@ -112,13 +114,13 @@ func (s *CookieService) GetCSRFCookie(c echo.Context) (string, error) {
 	return cookie.Value, nil
 }
 
-// GenerateCSRFToken generates a random CSRF token
+// GenerateCSRFToken generates a cryptographically secure random CSRF token
 func GenerateCSRFToken() string {
-	// Use crypto/rand for secure random token generation
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	// Generate 32 bytes of secure random data
 	b := make([]byte, 32)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp-based token if crypto/rand fails (should never happen)
+		return base64.URLEncoding.EncodeToString([]byte(time.Now().String()))
 	}
-	return string(b)
+	return base64.URLEncoding.EncodeToString(b)
 }
