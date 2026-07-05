@@ -14,7 +14,7 @@
   import MarkdownIt from 'markdown-it'
   import { MdEditor } from 'md-editor-v3'
   import TurndownService from 'turndown'
-  import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
@@ -73,12 +73,12 @@
   const routeId = (route.params as Record<string, string | string[] | undefined>).id
   const projectId = Array.isArray(routeId) ? routeId[0] : routeId
   const selectedTask = computed(() => tasks.value.find(task => task.id === selectedTaskId.value) || null)
-  const selectableParentTasks = computed(() => {
-    if (!selectedTask.value) {
-      return tasks.value
-    }
-    return tasks.value.filter(task => task.id !== selectedTask.value?.id)
-  })
+  // const selectableParentTasks = computed(() => {
+  //   if (!selectedTask.value) {
+  //     return tasks.value
+  //   }
+  //   return tasks.value.filter(task => task.id !== selectedTask.value?.id)
+  // })
   const selectedTaskChildren = computed(() => {
     if (!selectedTask.value) {
       return []
@@ -185,9 +185,9 @@
     return task.status?.name || 'To Do'
   }
 
-  function taskParentTaskId(task: KanbanTask): string | null {
-    return task.parentTask?.id || null
-  }
+  // function taskParentTaskId(task: KanbanTask): string | null {
+  //   return task.parentTask?.id || null
+  // }
 
   function initials(name: string): string {
     return name
@@ -449,19 +449,19 @@
     memberSearchFilter.value = ''
   }
 
-  function closeSelectDropdown(selectId: string) {
-    // Find and click the Select.Activator to toggle it closed
-    nextTick(() => {
-      // eslint-disable-next-line unicorn/prefer-query-selector
-      const activator = document.getElementById(selectId)
-      if (activator) {
-        activator.blur()
-        // Trigger escape key to close the select
-        const event = new KeyboardEvent('keydown', { key: 'Escape' })
-        activator.dispatchEvent(event)
-      }
-    })
-  }
+  // function closeSelectDropdown(selectId: string) {
+  //   // Find and click the Select.Activator to toggle it closed
+  //   nextTick(() => {
+  //     // eslint-disable-next-line unicorn/prefer-query-selector
+  //     const activator = document.getElementById(selectId)
+  //     if (activator) {
+  //       activator.blur()
+  //       // Trigger escape key to close the select
+  //       const event = new KeyboardEvent('keydown', { key: 'Escape' })
+  //       activator.dispatchEvent(event)
+  //     }
+  //   })
+  // }
 
   function openTaskDetail(taskId: string) {
     selectedTaskId.value = taskId
@@ -585,27 +585,27 @@
     }
   }
 
-  async function updateSelectedTaskParent(value: unknown) {
-    if (!selectedTask.value) return
-    const nextParentId = String(value || '')
-    if (nextParentId) {
-      const parent = tasks.value.find(task => task.id === nextParentId)
-      selectedTask.value.parentTask = parent ? { id: parent.id, title: parent.title } : { id: nextParentId }
-    } else {
-      selectedTask.value.parentTask = null
-    }
-    closeSelectDropdown('task-detail-parent')
-    try {
-      await persistTask(selectedTask.value)
-    } catch(error_: any) {
-      error.value = error_?.message || 'Failed to update parent task'
-      try {
-        await loadTasks()
-      } catch {
-        // Ignore errors during reload
-      }
-    }
-  }
+  // async function updateSelectedTaskParent(value: unknown) {
+  //   if (!selectedTask.value) return
+  //   const nextParentId = String(value || '')
+  //   if (nextParentId) {
+  //     const parent = tasks.value.find(task => task.id === nextParentId)
+  //     selectedTask.value.parentTask = parent ? { id: parent.id, title: parent.title } : { id: nextParentId }
+  //   } else {
+  //     selectedTask.value.parentTask = null
+  //   }
+  //   closeSelectDropdown('task-detail-parent')
+  //   try {
+  //     await persistTask(selectedTask.value)
+  //   } catch(error_: any) {
+  //     error.value = error_?.message || 'Failed to update parent task'
+  //     try {
+  //       await loadTasks()
+  //     } catch {
+  //       // Ignore errors during reload
+  //     }
+  //   }
+  // }
 
   async function deleteSelectedTask() {
     if (!selectedTask.value) return
