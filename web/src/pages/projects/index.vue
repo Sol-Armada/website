@@ -163,7 +163,7 @@
 
       <StatePanel v-else-if="error" :message="error" title="Failed to load projects" tone="error" />
 
-      <div v-else-if="projects.length === 0" class="tactical-panel p-12 text-center">
+      <div v-else-if="projects.length === 0" class="p-12 text-center">
         <h3 class="text-xl font-semibold text-on-surface mb-2">No Projects Yet</h3>
       </div>
 
