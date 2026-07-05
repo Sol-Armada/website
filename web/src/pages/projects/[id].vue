@@ -8,12 +8,18 @@
     TaskPriority,
     UpdateProjectTaskRequest,
   } from '@/services/adminService'
+  import StarterKit from '@tiptap/starter-kit'
+  import { EditorContent, useEditor } from '@tiptap/vue-3'
   import { Select } from '@vuetify/v0'
-  import { computed, nextTick, onMounted, ref } from 'vue'
+  import MarkdownIt from 'markdown-it'
+  import { MdEditor } from 'md-editor-v3'
+  import TurndownService from 'turndown'
+  import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import PortalShell from '@/components/layout/PortalShell.vue'
   import StatePanel from '@/components/ui/StatePanel.vue'
   import { adminService } from '@/services/adminService'
+  import 'md-editor-v3/lib/style.css'
 
   type KanbanTask = ProjectTask
 
@@ -23,6 +29,11 @@
   }
 
   const columns = ref<BoardColumn[]>([])
+  const markdownRenderer = new MarkdownIt({ breaks: true, linkify: true })
+  const markdownSerializer = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+  })
 
   const route = useRoute()
   const router = useRouter()
@@ -36,6 +47,7 @@
   const memberSearchResults = ref<MemberSummary[]>([])
   const memberSearchLoading = ref(false)
   const memberSearchDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+  const descriptionSaveDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
   const isAssigneeDropdownOpen = ref(false)
   const isStatusSelectOpen = ref(false)
   const isPrioritySelectOpen = ref(false)
@@ -43,6 +55,7 @@
   const isTaskDetailModalOpen = ref(false)
   const selectedTaskId = ref<string | null>(null)
   const titleValidationError = ref<string | null>(null)
+  const activeDescriptionEditorTaskId = ref<string | null>(null)
 
   const newTaskForm = ref({
     title: '',
@@ -72,6 +85,69 @@
     }
     return tasks.value.filter(task => task.parentTask?.id === selectedTask.value?.id)
   })
+
+  function isLikelyHtml(input: string): boolean {
+    return /<\/?[a-z][\s\S]*>/i.test(input)
+  }
+
+  function descriptionToEditorHtml(description: string): string {
+    const normalized = String(description || '').trim()
+    if (!normalized) {
+      return ''
+    }
+
+    if (isLikelyHtml(normalized)) {
+      return normalized
+    }
+
+    return markdownRenderer.render(normalized)
+  }
+
+  function editorHtmlToMarkdown(html: string): string {
+    const normalized = String(html || '').trim()
+    if (!normalized || normalized === '<p></p>') {
+      return ''
+    }
+
+    return markdownSerializer.turndown(normalized).trim()
+  }
+
+  const descriptionEditor = useEditor({
+    extensions: [StarterKit],
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'tiptap-content',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      if (!selectedTask.value) return
+      const html = editor.getHTML()
+      const markdown = editorHtmlToMarkdown(html)
+      void updateSelectedTask('description', markdown)
+    },
+  })
+
+  watch(
+    () => selectedTask.value?.id ?? null,
+    nextTaskId => {
+      if (!descriptionEditor.value) return
+
+      if (!nextTaskId) {
+        activeDescriptionEditorTaskId.value = null
+        descriptionEditor.value.commands.setContent('', { emitUpdate: false })
+        return
+      }
+
+      if (activeDescriptionEditorTaskId.value === nextTaskId) {
+        return
+      }
+
+      activeDescriptionEditorTaskId.value = nextTaskId
+      const content = descriptionToEditorHtml(selectedTask.value?.description || '')
+      descriptionEditor.value.commands.setContent(content, { emitUpdate: false })
+    },
+  )
 
   async function searchMembers(query: string) {
     // Clear existing debounce timer
@@ -400,6 +476,34 @@
   async function updateSelectedTask(field: 'title' | 'description' | 'assignee', value: string) {
     if (!selectedTask.value) return
 
+    if (field === 'description') {
+      selectedTask.value.description = value
+      const taskId = selectedTask.value.id
+
+      if (descriptionSaveDebounceTimer.value) {
+        clearTimeout(descriptionSaveDebounceTimer.value)
+      }
+
+      descriptionSaveDebounceTimer.value = setTimeout(async() => {
+        descriptionSaveDebounceTimer.value = null
+        const taskToPersist = tasks.value.find(task => task.id === taskId)
+        if (!taskToPersist) return
+
+        try {
+          await persistTask(taskToPersist)
+        } catch(error_: any) {
+          error.value = error_?.message || 'Failed to update task'
+          try {
+            await loadTasks()
+          } catch {
+            // Ignore errors during reload
+          }
+        }
+      }, 3000)
+
+      return
+    }
+
     if (field === 'assignee') {
       // Assignee can be empty (unassigned) or a member ID
       selectedTask.value.assignee = value.trim()
@@ -578,6 +682,13 @@
   onMounted(() => {
     void loadProject()
   })
+
+  onBeforeUnmount(() => {
+    if (descriptionSaveDebounceTimer.value) {
+      clearTimeout(descriptionSaveDebounceTimer.value)
+    }
+    descriptionEditor.value?.destroy()
+  })
 </script>
 
 <template>
@@ -647,8 +758,6 @@
                     <div>
                       <div class="task-title">{{ task.title }}</div>
 
-                      <div v-if="task.description" class="task-description">{{ task.description }}</div>
-
                       <div class="task-id">#{{ task.id }}</div>
                     </div>
 
@@ -691,14 +800,6 @@
             @click.self="closeTaskDetail"
           >
             <div class="task-detail-panel">
-              <div class="task-detail-header">
-                <h3>#{{ selectedTask.id }}</h3>
-
-                <button class="task-detail-close" type="button" @click="closeTaskDetail">
-                  x
-                </button>
-              </div>
-
               <div class="task-detail-body">
                 <div class="task-detail-main">
                   <input
@@ -708,12 +809,9 @@
                     @input="updateSelectedTask('title', ($event.target as HTMLInputElement).value)"
                   >
 
-                  <textarea
-                    class="task-detail-description"
-                    rows="4"
-                    :value="selectedTask.description"
-                    @input="updateSelectedTask('description', ($event.target as HTMLTextAreaElement).value)"
-                  />
+                  <div class="task-detail-description tiptap-editor-shell">
+                    <EditorContent v-if="descriptionEditor" :editor="descriptionEditor" />
+                  </div>
 
                   <section class="task-section">
                     <h4 class="task-section-title">Child Tasks</h4>
@@ -752,45 +850,6 @@
                 </div>
 
                 <aside class="task-detail-sidebar">
-                  <!-- <div class="task-sidebar-field">
-                    <label class="task-sidebar-label" for="task-detail-parent">Parent Task</label>
-
-                    <Select.Root :model-value="taskParentTaskId(selectedTask) || ''" @click.stop @update:model-value="updateSelectedTaskParent">
-                      <Select.Activator id="task-detail-parent" class="task-select-trigger">
-                        <Select.Value v-slot="{ selectedValue }">
-                          <span>
-                            {{
-                              selectedValue
-                                ? (tasks.find(task => task.id === selectedValue)?.title || selectedValue)
-                                : 'No parent'
-                            }}
-                          </span>
-                        </Select.Value>
-
-                        <Select.Placeholder>
-                          <span>No parent</span>
-                        </Select.Placeholder>
-
-                        <Select.Cue class="task-select-chevron">⌄</Select.Cue>
-                      </Select.Activator>
-
-                      <Select.Content class="task-select-menu">
-                        <Select.Item id="detail-parent-none" v-slot="{ attrs }" value="">
-                          <div v-bind="attrs" class="task-select-option">No parent</div>
-                        </Select.Item>
-
-                        <Select.Item
-                          v-for="task in selectableParentTasks"
-                          :id="`detail-parent-${task.id}`"
-                          :key="task.id"
-                          v-slot="{ attrs }"
-                          :value="task.id"
-                        >
-                          <div v-bind="attrs" class="task-select-option">{{ task.title }}</div>
-                        </Select.Item>
-                      </Select.Content>
-                    </Select.Root>
-                  </div> -->
 
                   <div class="task-sidebar-field">
                     <label class="task-sidebar-label" for="task-detail-status">Status</label>
@@ -929,6 +988,14 @@
                   </div>
                 </aside>
               </div>
+
+              <div class="task-detail-footer">
+                <span class="task-detail-footer-id">Task #{{ selectedTask.id }}</span>
+
+                <button class="task-detail-footer-close" type="button" @click="closeTaskDetail">
+                  Close
+                </button>
+              </div>
             </div>
           </div>
 
@@ -968,12 +1035,11 @@
 
                 <label class="task-field-label" for="task-description">Description</label>
 
-                <textarea
+                <MdEditor
                   id="task-description"
                   v-model="newTaskForm.description"
                   class="task-field task-field-textarea"
-                  placeholder="Add context for this task"
-                  rows="3"
+                  :preview="false"
                 />
 
                 <div class="task-field-row">
@@ -1320,6 +1386,44 @@
     line-height: 1.35;
   }
 
+  .markdown-card-preview {
+    max-height: 5.25rem;
+    overflow: hidden;
+  }
+
+  :deep(.markdown-card-preview .md-editor-preview-wrapper) {
+    padding: 0;
+    background: transparent;
+  }
+
+  :deep(.markdown-card-preview .md-editor-preview) {
+    color: var(--sa-fg-2);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  :deep(.markdown-card-preview .md-editor-preview h1),
+  :deep(.markdown-card-preview .md-editor-preview h2),
+  :deep(.markdown-card-preview .md-editor-preview h3) {
+    margin: 0.1rem 0 0.35rem;
+    color: var(--sa-fg);
+    font-size: 0.9rem;
+  }
+
+  .markdown-card-preview {
+    max-height: 5.25rem;
+    overflow: hidden;
+  }
+
+  :deep(.markdown-card-preview .md-editor-preview-wrapper) {
+    padding: 0;
+    background: transparent;
+  }
+
+  :deep(.markdown-card-preview p) {
+    margin: 0 0 0.3rem;
+  }
+
   .task-id {
     font-family: var(--font-mono);
     font-size: 0.72rem;
@@ -1498,8 +1602,62 @@
   }
 
   .task-field-textarea {
-    resize: vertical;
-    min-height: 5rem;
+    min-height: 13rem;
+  }
+
+  :deep(.task-field-textarea .md-editor-toolbar-wrapper),
+  :deep(.task-detail-description .md-editor-toolbar-wrapper) {
+    display: none;
+  }
+
+  :deep(.task-field-textarea .md-editor-footer),
+  :deep(.task-detail-description .md-editor-footer) {
+    display: none;
+  }
+
+  :deep(.task-field-textarea.md-editor),
+  :deep(.task-detail-description.md-editor) {
+    background: color-mix(in srgb, var(--v0-surface) 90%, rgb(0 0 0 / 1));
+    border: none;
+  }
+
+  :deep(.task-field-textarea .md-editor-input-wrapper),
+  :deep(.task-detail-description .md-editor-input-wrapper) {
+    background: color-mix(in srgb, var(--v0-surface) 90%, rgb(0 0 0 / 1));
+  }
+
+  :deep(.task-detail-description .md-editor-preview-wrapper),
+  :deep(.task-field-textarea .md-editor-preview-wrapper) {
+    background: color-mix(in srgb, var(--v0-surface) 90%, rgb(0 0 0 / 1));
+    border-left: 1px solid var(--sa-border-soft);
+  }
+
+  :deep(.task-detail-description .md-editor-preview),
+  :deep(.task-field-textarea .md-editor-preview) {
+    color: var(--sa-fg);
+  }
+
+  :deep(.task-field-textarea .cm-editor),
+  :deep(.task-detail-description .cm-editor),
+  :deep(.task-field-textarea .cm-scroller),
+  :deep(.task-detail-description .cm-scroller),
+  :deep(.task-field-textarea .cm-content),
+  :deep(.task-detail-description .cm-content) {
+    background: color-mix(in srgb, var(--v0-surface) 90%, rgb(0 0 0 / 1));
+  }
+
+  :deep(.task-field-textarea .md-editor-input),
+  :deep(.task-detail-description .md-editor-input) {
+    color: var(--sa-fg);
+  }
+
+  :deep(.task-field-textarea .cm-content),
+  :deep(.task-detail-description .cm-content),
+  :deep(.task-field-textarea .cm-line),
+  :deep(.task-detail-description .cm-line),
+  :deep(.task-field-textarea .cm-gutters),
+  :deep(.task-detail-description .cm-gutters) {
+    color: var(--sa-fg);
   }
 
   .task-select-trigger {
@@ -1781,19 +1939,90 @@
   .task-detail-description {
     width: 100%;
     margin-bottom: 1.1rem;
+    min-height: 17rem;
     border: 1px solid var(--sa-border);
     border-radius: 0.625rem;
-    background: transparent;
-    color: var(--sa-fg-2);
-    padding: 0.7rem 0.8rem;
-    font-size: 0.95rem;
-    resize: vertical;
+    overflow: hidden;
+  }
+
+  .tiptap-editor-shell {
+    background: color-mix(in srgb, var(--v0-surface) 90%, rgb(0 0 0 / 1));
+    padding: 0.85rem 0.95rem;
+  }
+
+  :deep(.tiptap-editor-shell .tiptap) {
+    min-height: 15rem;
+    color: var(--sa-fg);
+    outline: none;
+    white-space: pre-wrap;
+  }
+
+  :deep(.tiptap-editor-shell .tiptap h1) {
+    font-size: 1.45rem;
+    line-height: 1.25;
+    margin: 0.45rem 0;
+  }
+
+  :deep(.tiptap-editor-shell .tiptap h2) {
+    font-size: 1.2rem;
+    line-height: 1.3;
+    margin: 0.4rem 0;
+  }
+
+  :deep(.tiptap-editor-shell .tiptap h3) {
+    font-size: 1.05rem;
+    line-height: 1.35;
+    margin: 0.35rem 0;
+  }
+
+  :deep(.tiptap-editor-shell .tiptap p) {
+    margin: 0.35rem 0;
+  }
+
+  :deep(.tiptap-editor-shell .tiptap ul),
+  :deep(.tiptap-editor-shell .tiptap ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.2rem;
   }
 
   .task-detail-description:focus {
     outline: none;
     border-color: var(--sa-gold);
     box-shadow: 0 0 0 2px rgb(230 168 45 / 0.2);
+  }
+
+  .task-detail-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 1.25rem;
+    border-top: 1px solid var(--sa-border-soft);
+    background: rgb(0 0 0 / 0.14);
+  }
+
+  .task-detail-footer-id {
+    color: var(--sa-muted);
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.03em;
+  }
+
+  .task-detail-footer-close {
+    border: 1px solid var(--sa-border);
+    background: transparent;
+    color: var(--sa-fg);
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 150ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .task-detail-footer-close:hover {
+    border-color: var(--sa-gold);
+    color: var(--sa-gold);
   }
 
   .task-section {
@@ -1868,7 +2097,7 @@
   .task-activity-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.25rem;
   }
 
   .task-activity-item {
@@ -1920,13 +2149,13 @@
   }
 
   .task-activity-details {
-    margin-top: 0.35rem;
+    /* margin-top: 0.35rem; */
     color: var(--sa-fg-2);
-    font-size: 0.82rem;
-    background: rgb(0 0 0 / 0.16);
-    border: 1px solid var(--sa-border);
-    border-radius: 0.5rem;
-    padding: 0.45rem 0.6rem;
+    font-size: 0.69rem;
+    /* background: rgb(0 0 0 / 0.16); */
+    /* border: 1px solid var(--sa-border); */
+    /* border-radius: 0.5rem; */
+    /* padding: 0.45rem 0.6rem; */
   }
 
   .task-detail-sidebar {
