@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -354,10 +353,6 @@ func (s *MemberService) getRecentTokenActivity(memberID string) ([]MemberActivit
 	}
 
 	return result, nil
-}
-
-func ListProjects(ctx context.Context) ([]*projects.Project, error) {
-	return projects.ListProjects(ctx)
 }
 
 func CreateProject(name, description string, statusId int32, ownerId *string, dueAt *time.Time) (*projects.Project, error) {

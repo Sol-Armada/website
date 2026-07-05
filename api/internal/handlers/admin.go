@@ -128,7 +128,7 @@ func (h *AdminHandler) taskWithActivity(ctx context.Context, task *projects.Task
 }
 
 func (h *AdminHandler) ListProjects(c echo.Context) error {
-	projects, err := service.ListProjects(c.Request().Context())
+	projects, err := projects.ListProjects(c.Request().Context())
 	if err != nil {
 		h.logger.Error("Failed to list projects", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
