@@ -2,7 +2,7 @@ module github.com/sol-armada/website
 
 go 1.26.3
 
-replace github.com/sol-armada/sol-bot v1.15.1 => ../../sol-bot
+// replace github.com/sol-armada/sol-bot v1.15.1 => ../../sol-bot
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
