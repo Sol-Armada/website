@@ -3,16 +3,22 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"log/slog"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/sol-armada/sol-bot/database"
+	"github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/projects"
 	"github.com/sol-armada/website/internal/dto"
 	"github.com/sol-armada/website/internal/service"
 )
@@ -41,6 +47,17 @@ type AdminHandler struct {
 	logger        *slog.Logger
 }
 
+type taskActivityResponse struct {
+	ID      string `json:"id"`
+	Summary string `json:"summary"`
+	Time    string `json:"time,omitempty"`
+}
+
+type taskWithActivityResponse struct {
+	*projects.Task
+	Activity []taskActivityResponse `json:"activity"`
+}
+
 func NewAdminHandler(adminService AdminServiceInterface, configService *service.ConfigService, logger *slog.Logger) *AdminHandler {
 	return &AdminHandler{
 		adminService:  adminService,
@@ -49,16 +66,501 @@ func NewAdminHandler(adminService AdminServiceInterface, configService *service.
 	}
 }
 
-func (h *AdminHandler) GetOverview(c echo.Context) error {
-	// Check if user has admin role
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
+func (h *AdminHandler) listTaskActivity(ctx context.Context, taskID uuid.UUID) ([]taskActivityResponse, error) {
+	db := database.Get()
+	if db == nil {
+		return nil, errors.New("database not initialized")
+	}
+
+	history, err := db.Queries.ListTaskHistory(ctx, taskID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	activity := make([]taskActivityResponse, 0, len(history))
+	for _, entry := range history {
+		if len(entry.Details) == 0 {
+			continue
+		}
+
+		var details map[string]any
+		if err := json.Unmarshal(entry.Details, &details); err != nil {
+			h.logger.Warn("Failed to parse task history details", "taskId", taskID.String(), "historyId", entry.ID, "error", err)
+			continue
+		}
+
+		summary, _ := details["summary"].(string)
+		summary = strings.TrimSpace(summary)
+		if summary == "" {
+			continue
+		}
+
+		item := taskActivityResponse{
+			ID:      strconv.FormatInt(entry.ID, 10),
+			Summary: summary,
+		}
+		if entry.PerformedAt.Valid {
+			item.Time = entry.PerformedAt.Time.UTC().Format(time.RFC3339)
+		}
+
+		activity = append(activity, item)
+	}
+	if len(activity) > 5 {
+		activity = activity[:5]
+	}
+	return activity, nil
+}
+
+func (h *AdminHandler) taskWithActivity(ctx context.Context, task *projects.Task) taskWithActivityResponse {
+	response := taskWithActivityResponse{Task: task, Activity: []taskActivityResponse{}}
+	if task == nil {
+		return response
+	}
+
+	activity, err := h.listTaskActivity(ctx, task.Id)
+	if err != nil {
+		h.logger.Warn("Failed to list task activity", "taskId", task.Id.String(), "error", err)
+		return response
+	}
+
+	response.Activity = activity
+	return response
+}
+
+func (h *AdminHandler) ListProjects(c echo.Context) error {
+	projects, err := service.ListProjects(c.Request().Context())
+	if err != nil {
+		h.logger.Error("Failed to list projects", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "projects_list_failed",
+			Message: "Failed to fetch projects list",
 		})
 	}
 
+	return c.JSON(http.StatusOK, projects)
+}
+
+func (h *AdminHandler) CreateProject(c echo.Context) error {
+	var req dto.CreateProjectRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	// Parse optional due date
+	var dueAt *time.Time
+	if req.DueAt != nil && *req.DueAt != "" {
+		parsed, err := time.Parse(time.RFC3339, *req.DueAt)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_date",
+				Message: "Invalid due date format (expected RFC3339)",
+			})
+		}
+		dueAt = &parsed
+	}
+
+	project, err := service.CreateProject(req.Name, req.Description, req.StatusID, req.OwnerID, dueAt)
+	if err != nil {
+		h.logger.Error("Failed to create project", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_create_failed",
+			Message: "Failed to create project",
+		})
+	}
+
+	return c.JSON(http.StatusCreated, project)
+}
+
+func (h *AdminHandler) ListProjectStatuses(c echo.Context) error {
+	db := database.Get()
+	if db == nil {
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "database_error",
+			Message: "Database not initialized",
+		})
+	}
+
+	ctx := context.Background()
+	statuses, err := db.Queries.ListProjectStatuses(ctx)
+	if err != nil {
+		h.logger.Error("Failed to list project statuses", "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "statuses_fetch_failed",
+			Message: "Failed to fetch project statuses",
+		})
+	}
+
+	type StatusResponse struct {
+		Id   int32  `json:"id"`
+		Name string `json:"name"`
+	}
+
+	response := make([]StatusResponse, len(statuses))
+	for i, status := range statuses {
+		response[i] = StatusResponse{
+			Id:   status.ID,
+			Name: status.Name,
+		}
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+func (h *AdminHandler) ListProjectTasks(c echo.Context) error {
+	projectId := strings.TrimSpace(c.Param("id"))
+	if projectId == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Project Id is required",
+		})
+	}
+
+	projectUUID, err := uuid.Parse(projectId)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid project Id",
+		})
+	}
+
+	tasks, err := service.ListProjectTasks(c.Request().Context(), projectUUID)
+	if err != nil {
+		h.logger.Error("Failed to list project tasks", "projectId", projectId, "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_tasks_list_failed",
+			Message: "Failed to fetch project tasks",
+		})
+	}
+
+	response := make([]taskWithActivityResponse, 0, len(tasks))
+	for _, task := range tasks {
+		response = append(response, h.taskWithActivity(c.Request().Context(), task))
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"tasks": response})
+}
+
+func (h *AdminHandler) ListProjectTaskStatuses(c echo.Context) error {
+	projectId := strings.TrimSpace(c.Param("id"))
+	if projectId == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Project Id is required",
+		})
+	}
+
+	projectUUID, err := uuid.Parse(projectId)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid project Id",
+		})
+	}
+
+	statuses, err := service.ListTaskStatuses(c.Request().Context(), projectUUID)
+	if err != nil {
+		h.logger.Error("Failed to list project task statuses", "projectId", projectId, "error", err)
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_task_statuses_list_failed",
+			Message: "Failed to fetch project task statuses",
+		})
+	}
+
+	return c.JSON(http.StatusOK, statuses)
+}
+
+func (h *AdminHandler) CreateProjectTask(c echo.Context) error {
+	projectId := strings.TrimSpace(c.Param("id"))
+	if projectId == "" {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Project Id is required",
+		})
+	}
+
+	projectUUID, err := uuid.Parse(projectId)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid project Id",
+		})
+	}
+
+	var req service.CreateProjectTaskInput
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	userId, _ := c.Get("user_id").(string)
+	task, err := service.CreateProjectTask(c.Request().Context(), projectUUID, userId, req)
+	if err != nil {
+		h.logger.Error("Failed to create project task", "projectId", projectId, "error", err)
+		if strings.Contains(strings.ToLower(err.Error()), "title is required") || strings.Contains(strings.ToLower(err.Error()), "invalid due date") {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: err.Error(),
+			})
+		}
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_task_create_failed",
+			Message: "Failed to create project task",
+		})
+	}
+
+	return c.JSON(http.StatusCreated, h.taskWithActivity(c.Request().Context(), task))
+}
+
+func (h *AdminHandler) UpdateProjectTask(c echo.Context) error {
+	userId, _ := c.Get("user_id").(string)
+	member, err := members.Get(userId)
+	if err != nil {
+		if errors.Is(err, members.MemberNotFound) {
+			return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+				Error:   "member_not_found",
+				Message: "Member not found",
+			})
+		}
+		h.logger.Error("Getting member details", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "member_fetch_failed",
+			Message: "Failed to fetch member details",
+		})
+	}
+
+	var projectId uuid.UUID
+	if projectIdStr := strings.TrimSpace(c.Param("id")); projectIdStr != "" {
+		var err error
+		projectId, err = uuid.Parse(projectIdStr)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid project Id",
+			})
+		}
+	}
+
+	var taskId uuid.UUID
+	if taskIdStr := strings.TrimSpace(c.Param("taskId")); taskIdStr != "" {
+		var err error
+		taskId, err = uuid.Parse(taskIdStr)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid task Id",
+			})
+		}
+	}
+
+	if projectId == uuid.Nil || taskId == uuid.Nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Project Id and task Id are required",
+		})
+	}
+
+	var req service.UpdateProjectTaskInput
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Invalid request body",
+		})
+	}
+
+	task, err := projects.GetTask(c.Request().Context(), taskId)
+	if err != nil {
+		if errors.Is(err, projects.ErrTaskNotFound) {
+			return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+				Error:   "not_found",
+				Message: "Project task not found",
+			})
+		}
+		h.logger.Error("Getting task for update", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_task_fetch_failed",
+			Message: "Failed to fetch project task",
+		})
+	}
+	beforeTask := *task // Create a copy of the task before updating
+
+	var assignee *members.Member
+	if req.Assignee != "" {
+		assignee, err = members.Get(req.Assignee)
+		if err != nil {
+			if errors.Is(err, members.MemberNotFound) {
+				return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+					Error:   "assignee_not_found",
+					Message: "Assignee member not found",
+				})
+			}
+			h.logger.Error("Getting assignee for task update", "error", err.Error())
+			return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+				Error:   "assignee_fetch_failed",
+				Message: "Failed to fetch assignee member",
+			})
+		}
+	}
+
+	var dueAt *time.Time
+	if req.DueAt != nil && *req.DueAt != "" {
+		parsed, err := time.Parse(time.RFC3339, *req.DueAt)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_date",
+				Message: "Invalid due date format (expected RFC3339)",
+			})
+		}
+		dueAt = &parsed
+	}
+
+	taskStatus, err := projects.GetTaskStatus(c.Request().Context(), projectId, string(req.Status))
+	if err != nil {
+		h.logger.Error("Getting task status", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "task_status_fetch_failed",
+			Message: "Failed to fetch task status",
+		})
+	}
+
+	var parentTaskId *uuid.UUID
+	if req.ParentTaskId != nil && *req.ParentTaskId != "" {
+		parsedParentTaskId, err := uuid.Parse(*req.ParentTaskId)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid parent task Id",
+			})
+		}
+		parentTaskId = &parsedParentTaskId
+	}
+
+	var parentTask *projects.Task
+	if parentTaskId != nil && *parentTaskId != uuid.Nil {
+		parentTask, err = projects.GetTask(c.Request().Context(), *parentTaskId)
+		if err != nil {
+			if errors.Is(err, projects.ErrTaskNotFound) {
+				return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+					Error:   "parent_task_not_found",
+					Message: "Parent task not found",
+				})
+			}
+			h.logger.Error("Getting parent task for task update", "error", err.Error())
+			return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+				Error:   "parent_task_fetch_failed",
+				Message: "Failed to fetch parent task",
+			})
+		}
+	}
+
+	task.Title = req.Title
+	task.Description = req.Description
+	task.Priority = projects.TaskPriority(req.Priority)
+	task.Assignee = assignee
+	task.DueAt = dueAt
+	task.Status = taskStatus
+	task.ParentTask = parentTask
+
+	if err := projects.UpdateTask(c.Request().Context(), &beforeTask, task, member); err != nil {
+		h.logger.Error("Updating task", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_task_update_failed",
+			Message: "Failed to update project task",
+		})
+	}
+
+	return c.JSON(http.StatusOK, h.taskWithActivity(c.Request().Context(), task))
+}
+
+func (h *AdminHandler) DeleteProjectTask(c echo.Context) error {
+	var projectId, taskId uuid.UUID
+	if projectIdStr := strings.TrimSpace(c.Param("id")); projectIdStr != "" {
+		var err error
+		projectId, err = uuid.Parse(projectIdStr)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid project Id",
+			})
+		}
+	}
+	if taskIdStr := strings.TrimSpace(c.Param("taskId")); taskIdStr != "" {
+		var err error
+		taskId, err = uuid.Parse(taskIdStr)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid task Id",
+			})
+		}
+	}
+	if taskId == uuid.Nil {
+		if taskIdStr := strings.TrimSpace(c.Param("ticketId")); taskIdStr != "" {
+			var err error
+			taskId, err = uuid.Parse(taskIdStr)
+			if err != nil {
+				return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+					Error:   "invalid_request",
+					Message: "Invalid task Id",
+				})
+			}
+		}
+	}
+
+	if projectId == uuid.Nil || taskId == uuid.Nil {
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "invalid_request",
+			Message: "Project Id and task Id are required",
+		})
+	}
+
+	userId, _ := c.Get("user_id").(string)
+	task, err := projects.GetTask(c.Request().Context(), taskId)
+	if err != nil {
+		if errors.Is(err, projects.ErrTaskNotFound) {
+			return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+				Error:   "not_found",
+				Message: "Project task not found",
+			})
+		}
+		h.logger.Error("Getting task for delete", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_task_fetch_failed",
+			Message: "Failed to fetch project task",
+		})
+	}
+
+	member, err := members.Get(userId)
+	if err != nil {
+		if errors.Is(err, members.MemberNotFound) {
+			return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+				Error:   "member_not_found",
+				Message: "Member not found",
+			})
+		}
+		h.logger.Error("Getting member details", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "member_fetch_failed",
+			Message: "Failed to fetch member details",
+		})
+	}
+
+	if err := task.Delete(c.Request().Context(), member); err != nil {
+		h.logger.Error("Deleting project task", "error", err.Error())
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "project_task_delete_failed",
+			Message: "Failed to delete project task",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"deleted": true})
+}
+
+func (h *AdminHandler) GetOverview(c echo.Context) error {
 	result, err := h.adminService.GetOverviewStats(c.Request().Context())
 	if err != nil {
 		h.logger.Error("Failed to fetch admin overview", "error", err)
@@ -72,14 +574,6 @@ func (h *AdminHandler) GetOverview(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetAttendance(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	limit := 50
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
@@ -113,14 +607,6 @@ func (h *AdminHandler) GetAttendance(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	limit := 50
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
@@ -147,17 +633,17 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 	}
 
 	// collect ids to turn into names
-	userIDs := make(map[string]struct{})
+	userIds := make(map[string]struct{})
 	for _, tx := range result {
-		userIDs[tx.MemberID] = struct{}{}
+		userIds[tx.MemberID] = struct{}{}
 	}
 
-	memberIDs := make([]string, 0, len(userIDs))
-	for id := range userIDs {
-		memberIDs = append(memberIDs, id)
+	memberIds := make([]string, 0, len(userIds))
+	for id := range userIds {
+		memberIds = append(memberIds, id)
 	}
 
-	members, err := h.adminService.GetMembersByIds(c.Request().Context(), memberIDs)
+	members, err := h.adminService.GetMembersByIds(c.Request().Context(), memberIds)
 	if err != nil {
 		h.logger.Error("Failed to fetch member details", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -198,14 +684,6 @@ func (h *AdminHandler) GetTokenLedger(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetTokenLedgerAnalytics(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	result, err := h.adminService.GetTokenLedgerAnalytics(c.Request().Context())
 	if err != nil {
 		h.logger.Error("Failed to fetch token ledger analytics", "error", err)
@@ -219,14 +697,6 @@ func (h *AdminHandler) GetTokenLedgerAnalytics(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetAttendanceAnalytics(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	result, err := h.adminService.GetAttendanceAnalytics(c.Request().Context())
 	if err != nil {
 		h.logger.Error("Failed to fetch attendance analytics", "error", err)
@@ -240,14 +710,6 @@ func (h *AdminHandler) GetAttendanceAnalytics(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetMembers(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	limit := 50
 	if l := c.QueryParam("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
@@ -281,14 +743,6 @@ func (h *AdminHandler) GetMembers(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetAvailableAttendanceNames(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	attendanceNames, err := h.configService.GetAvailableAttendanceNames()
 	if err != nil {
 		h.logger.Error("Failed to fetch attendance names", "error", err)
@@ -302,14 +756,6 @@ func (h *AdminHandler) GetAvailableAttendanceNames(c echo.Context) error {
 }
 
 func (h *AdminHandler) CreateAttendanceName(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	var req struct {
 		Name string `json:"name"`
 	}
@@ -352,14 +798,6 @@ func (h *AdminHandler) CreateAttendanceName(c echo.Context) error {
 }
 
 func (h *AdminHandler) DeleteAttendanceName(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	var req struct {
 		Name string `json:"name"`
 	}
@@ -402,14 +840,6 @@ func (h *AdminHandler) DeleteAttendanceName(c echo.Context) error {
 }
 
 func (h *AdminHandler) CreateAttendanceRecord(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	// get the body
 	req := service.CreateAttendanceRecordInput{}
 	if err := c.Bind(&req); err != nil {
@@ -434,19 +864,11 @@ func (h *AdminHandler) CreateAttendanceRecord(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetAttendanceRecord(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	id := c.Param("id")
 	if id == "" {
 		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid_request",
-			Message: "Attendance record ID is required",
+			Message: "Attendance record Id is required",
 		})
 	}
 
@@ -470,19 +892,11 @@ func (h *AdminHandler) GetAttendanceRecord(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetMembersByAttendance(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	attendanceId := c.Param("id")
 	if attendanceId == "" {
 		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid_request",
-			Message: "Attendance ID is required",
+			Message: "Attendance Id is required",
 		})
 	}
 
@@ -499,19 +913,11 @@ func (h *AdminHandler) GetMembersByAttendance(c echo.Context) error {
 }
 
 func (h *AdminHandler) GetAttendanceEditPayload(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid_request",
-			Message: "Attendance record ID is required",
+			Message: "Attendance record Id is required",
 		})
 	}
 
@@ -535,19 +941,11 @@ func (h *AdminHandler) GetAttendanceEditPayload(c echo.Context) error {
 }
 
 func (h *AdminHandler) UpdateAttendanceRecord(c echo.Context) error {
-	roles, _ := c.Get("roles").([]string)
-	if !hasRole(roles, "admin") {
-		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error:   "forbidden",
-			Message: "Admin access required",
-		})
-	}
-
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid_request",
-			Message: "Attendance record ID is required",
+			Message: "Attendance record Id is required",
 		})
 	}
 
@@ -608,8 +1006,4 @@ func (h *AdminHandler) UpdateAttendanceRecord(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, payload)
-}
-
-func hasRole(roles []string, role string) bool {
-	return slices.Contains(roles, role)
 }

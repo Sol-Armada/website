@@ -28,6 +28,7 @@
   const adminItems = computed<NavItem[]>(() => {
     const items: NavItem[] = [
       { title: 'Overview', path: '/admin/overview', roles: ['admin'] },
+      { title: 'Projects', path: '/projects', roles: ['admin'] },
       { title: 'Attendance', path: '/admin/attendance', roles: ['moderator', 'admin'] },
       { title: 'Token Ledger', path: '/admin/token-ledger', roles: ['admin'] },
       { title: 'Members', path: '/admin/members', roles: ['admin'] },

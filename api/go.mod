@@ -2,16 +2,16 @@ module github.com/sol-armada/website
 
 go 1.26.3
 
-// replace github.com/sol-armada/sol-bot v1.14.21 => ../../sol-bot
+replace github.com/sol-armada/sol-bot v1.15.0 => ../../sol-bot
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/labstack/echo/v4 v4.15.2
-	github.com/redis/go-redis/v9 v9.20.0
-	github.com/sol-armada/sol-bot v1.14.22
+	github.com/labstack/echo/v4 v4.15.4
+	github.com/redis/go-redis/v9 v9.21.0
+	github.com/sol-armada/sol-bot v1.15.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/time v0.15.0
 )
@@ -32,7 +32,7 @@ require (
 	github.com/labstack/gommon v0.5.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
-	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.4.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
@@ -46,9 +46,9 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 )

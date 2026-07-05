@@ -1,8 +1,9 @@
 package dto
 
-import "maps"
-
-import "time"
+import (
+	"maps"
+	"time"
+)
 
 // StandardResponse wraps all API responses
 type StandardResponse struct {
@@ -57,4 +58,13 @@ func NewAppError(code, message string, status int) *AppError {
 func (e *AppError) WithDetails(details map[string]any) *AppError {
 	maps.Copy(e.Details, details)
 	return e
+}
+
+// CreateProjectRequest represents the input for creating a new project
+type CreateProjectRequest struct {
+	Name        string  `json:"name" validate:"required,min=1,max=200"`
+	Description string  `json:"description"`
+	StatusID    int32   `json:"statusId" validate:"required,min=1"`
+	OwnerID     *string `json:"ownerId,omitempty"`
+	DueAt       *string `json:"dueAt,omitempty"`
 }

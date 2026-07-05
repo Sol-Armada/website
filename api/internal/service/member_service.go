@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/projects"
 	"github.com/sol-armada/sol-bot/tokens"
 )
 
@@ -24,6 +26,23 @@ type PaginatedResponse struct {
 	Records []TokenTransaction `json:"records"`
 	Page    int                `json:"page"`
 	Limit   int                `json:"limit"`
+}
+
+type Project struct {
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	StatusID    int32      `json:"statusId"`
+	StatusName  string     `json:"statusName"`
+	OwnerID     *string    `json:"ownerId,omitempty"`
+	OwnerName   string     `json:"ownerName,omitempty"`
+	DueAt       *time.Time `json:"dueAt,omitempty"`
+	Progress    int        `json:"progress"`
+	TotalTasks  int        `json:"totalTasks"`
+	DoneTasks   int        `json:"doneTasks"`
+	MemberCount int        `json:"memberCount"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
 }
 
 type MemberDashboardData struct {
@@ -335,4 +354,30 @@ func (s *MemberService) getRecentTokenActivity(memberID string) ([]MemberActivit
 	}
 
 	return result, nil
+}
+
+func ListProjects(ctx context.Context) ([]*projects.Project, error) {
+	return projects.ListProjects(ctx)
+}
+
+func CreateProject(name, description string, statusId int32, ownerId *string, dueAt *time.Time) (*projects.Project, error) {
+	var owner *members.Member
+	if ownerId != nil {
+		var err error
+		owner, err = members.Get(*ownerId)
+		if err != nil {
+			if errors.Is(err, members.MemberNotFound) {
+				return nil, fmt.Errorf("owner not found")
+			}
+
+			return nil, fmt.Errorf("failed to fetch owner: %w", err)
+		}
+	}
+
+	newProject, err := projects.New(name, description, owner, dueAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create project: %w", err)
+	}
+
+	return newProject, nil
 }

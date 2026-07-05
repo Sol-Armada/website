@@ -20,9 +20,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sol-armada/sol-bot/attendance"
 	solbotdb "github.com/sol-armada/sol-bot/database"
+	solbotpg "github.com/sol-armada/sol-bot/database"
 	"github.com/sol-armada/sol-bot/database/dbnotify"
-	solbotpg "github.com/sol-armada/sol-bot/database/postgresql"
 	"github.com/sol-armada/sol-bot/members"
+	"github.com/sol-armada/sol-bot/projects"
 	"github.com/sol-armada/sol-bot/tokens"
 
 	"github.com/sol-armada/website/internal/auth"
@@ -100,6 +101,10 @@ func main() {
 	}
 	if err := tokens.Setup(); err != nil {
 		log.Error("Failed to initialize sol-bot tokens backend", "error", err)
+		os.Exit(1)
+	}
+	if err := projects.Setup(); err != nil {
+		log.Error("Failed to initialize sol-bot projects backend", "error", err)
 		os.Exit(1)
 	}
 
@@ -181,7 +186,7 @@ func main() {
 
 	notifyListener, err := dbnotify.NewListener(dbnotify.ListenerConfig{
 		DSN: cfg.Database.DSN,
-		Channels: []string{
+		Channels: []dbnotify.Channel{
 			dbnotify.ChannelMembers,
 			dbnotify.ChannelAttendance,
 			dbnotify.ChannelTokens,
@@ -219,7 +224,7 @@ func main() {
 					payload["member_id"] = memberID
 				}
 
-				operation := strings.ToLower(event.Operation)
+				operation := strings.ToLower(string(event.Operation))
 				if operation != "delete" && memberID != "" {
 					memberSummary, memberErr := adminService.GetMemberSummaryByID(notifyCtx, memberID)
 					if memberErr != nil {
@@ -291,6 +296,19 @@ func main() {
 	memberAPI.GET("/token-ledger", memberHandler.GetTokenLedger)
 
 	adminAPI := api.Group("/admin")
+	adminAPI.Use(appMiddleware.RequireAdmin)
+	adminAPI.GET("/projects", adminHandler.ListProjects)
+	adminAPI.POST("/projects", adminHandler.CreateProject)
+	adminAPI.GET("/projects/:id/task-statuses", adminHandler.ListProjectTaskStatuses)
+	adminAPI.GET("/projects/:id/tasks", adminHandler.ListProjectTasks)
+	adminAPI.POST("/projects/:id/tasks", adminHandler.CreateProjectTask)
+	adminAPI.PATCH("/projects/:id/tasks/:taskId", adminHandler.UpdateProjectTask)
+	adminAPI.DELETE("/projects/:id/tasks/:taskId", adminHandler.DeleteProjectTask)
+	adminAPI.GET("/projects/:id/tickets", adminHandler.ListProjectTasks)
+	adminAPI.POST("/projects/:id/tickets", adminHandler.CreateProjectTask)
+	adminAPI.PATCH("/projects/:id/tickets/:ticketId", adminHandler.UpdateProjectTask)
+	adminAPI.DELETE("/projects/:id/tickets/:ticketId", adminHandler.DeleteProjectTask)
+	adminAPI.GET("/project-statuses", adminHandler.ListProjectStatuses)
 	adminAPI.GET("/overview", adminHandler.GetOverview)
 	adminAPI.GET("/attendance", adminHandler.GetAttendance)
 	adminAPI.GET("/attendance/analytics", adminHandler.GetAttendanceAnalytics)

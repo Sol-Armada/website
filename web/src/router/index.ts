@@ -28,13 +28,18 @@ router.beforeEach(async to => {
     return true
   }
 
-  const isProtected = to.path.startsWith('/dashboard') || to.path.startsWith('/admin')
+  const isProtected = to.path.startsWith('/dashboard') || to.path.startsWith('/admin') || to.path.startsWith('/projects')
 
   if (isProtected && !authStore.isAuthenticated) {
     const isAuthenticated = await authStore.checkAuth()
     if (!isAuthenticated) {
       return '/auth/login'
     }
+  }
+
+  // Projects page is admin-only
+  if (to.path.startsWith('/projects') && !authStore.hasRole('admin')) {
+    return '/dashboard'
   }
 
   if (to.path.startsWith('/admin/attendance') && !authStore.hasAnyRole(['moderator', 'admin'])) {

@@ -3,7 +3,7 @@ package realtime
 import "github.com/sol-armada/sol-bot/database/dbnotify"
 
 // TopicForNotifyChannel maps sol-bot dbnotify channels to websocket topics.
-func TopicForNotifyChannel(channel string) (string, bool) {
+func TopicForNotifyChannel(channel dbnotify.Channel) (string, bool) {
 	switch channel {
 	case dbnotify.ChannelMembers:
 		return TopicAdminMembers, true
