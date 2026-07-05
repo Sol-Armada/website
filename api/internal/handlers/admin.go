@@ -128,7 +128,7 @@ func (h *AdminHandler) taskWithActivity(ctx context.Context, task *projects.Task
 }
 
 func (h *AdminHandler) ListProjects(c echo.Context) error {
-	projects, err := projects.ListProjects(c.Request().Context())
+	prjcts, err := projects.ListProjects(c.Request().Context())
 	if err != nil {
 		h.logger.Error("Failed to list projects", "error", err)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -137,7 +137,19 @@ func (h *AdminHandler) ListProjects(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, projects)
+	for _, project := range prjcts {
+		tasks, err := projects.ListTasks(c.Request().Context(), project.Id)
+		if err != nil {
+			h.logger.Error("Failed to list tasks for project", "projectId", project.Id.String(), "error", err)
+			return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+				Error:   "project_tasks_list_failed",
+				Message: "Failed to fetch tasks for project",
+			})
+		}
+		project.Tasks = tasks
+	}
+
+	return c.JSON(http.StatusOK, prjcts)
 }
 
 func (h *AdminHandler) CreateProject(c echo.Context) error {
