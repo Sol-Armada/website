@@ -68,9 +68,9 @@ export async function requestJson<T>(
   init?: RequestInit,
   params?: Record<string, string | number | undefined>,
 ): Promise<T> {
-  const headers: Record<string, string> = {
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...init?.headers,
+    ...init?.headers as Record<string, string>,
   }
 
   // Add CSRF token for state-changing requests
@@ -78,7 +78,7 @@ export async function requestJson<T>(
   if (requiresCsrfToken(method)) {
     const csrfToken = getCsrfToken()
     if (csrfToken) {
-      headers['X-CSRF-Token'] = csrfToken
+      (headers as Record<string, string>)['X-CSRF-Token'] = csrfToken
     }
   }
 
@@ -96,9 +96,9 @@ export async function requestJson<T>(
 }
 
 export async function requestNoContent(path: string, init?: RequestInit): Promise<void> {
-  const headers: Record<string, string> = {
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...init?.headers,
+    ...init?.headers as Record<string, string>,
   }
 
   // Add CSRF token for state-changing requests
@@ -106,7 +106,7 @@ export async function requestNoContent(path: string, init?: RequestInit): Promis
   if (requiresCsrfToken(method)) {
     const csrfToken = getCsrfToken()
     if (csrfToken) {
-      headers['X-CSRF-Token'] = csrfToken
+      (headers as Record<string, string>)['X-CSRF-Token'] = csrfToken
     }
   }
 
