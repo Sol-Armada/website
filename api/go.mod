@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/labstack/echo/v4 v4.15.4
 	github.com/redis/go-redis/v9 v9.21.0
-	github.com/sol-armada/sol-bot v1.15.2
+	github.com/sol-armada/sol-bot v1.15.3
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/time v0.15.0
 )

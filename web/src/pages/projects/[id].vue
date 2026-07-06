@@ -46,12 +46,17 @@
   const memberSearchResults = ref<MemberSummary[]>([])
   const memberSearchLoading = ref(false)
   const memberSearchDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+  const createTaskAssigneeSearch = ref('')
+  const createTaskAssigneeResults = ref<MemberSummary[]>([])
+  const createTaskAssigneeLoading = ref(false)
+  const createTaskAssigneeDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
   const descriptionSaveDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
   const isAssigneeDropdownOpen = ref(false)
   const isStatusSelectOpen = ref(false)
   const isPrioritySelectOpen = ref(false)
   const isCreateTaskStatusDropdownOpen = ref(false)
   const isCreateTaskPriorityDropdownOpen = ref(false)
+  const isCreateTaskAssigneeDropdownOpen = ref(false)
   const isNewTaskModalOpen = ref(false)
   const isTaskDetailModalOpen = ref(false)
   const selectedTaskId = ref<string | null>(null)
@@ -176,6 +181,13 @@
       return members.value.slice(0, 10)
     }
     return memberSearchResults.value
+  })
+
+  const filteredCreateTaskAssignees = computed(() => {
+    if (!createTaskAssigneeSearch.value) {
+      return members.value.slice(0, 10)
+    }
+    return createTaskAssigneeResults.value
   })
 
   function taskAssigneeName(task: KanbanTask): string {
@@ -432,13 +444,15 @@
       title: '',
       description: '',
       priority: 1,
-      assignee: 'Unassigned',
+      assignee: '',
       dueDate: '',
       status: columns.value.length > 0 ? columns.value[0].id : 'To Do' as KanbanStatus,
     }
     titleValidationError.value = null
     isCreateTaskStatusDropdownOpen.value = false
     isCreateTaskPriorityDropdownOpen.value = false
+    isCreateTaskAssigneeDropdownOpen.value = false
+    createTaskAssigneeSearch.value = ''
     isNewTaskModalOpen.value = true
   }
 
@@ -446,6 +460,8 @@
     titleValidationError.value = null
     isCreateTaskStatusDropdownOpen.value = false
     isCreateTaskPriorityDropdownOpen.value = false
+    isCreateTaskAssigneeDropdownOpen.value = false
+    createTaskAssigneeSearch.value = ''
     isNewTaskModalOpen.value = false
   }
 
@@ -457,6 +473,42 @@
   function selectCreateTaskPriority(priority: TaskPriority) {
     newTaskForm.value.priority = priority
     isCreateTaskPriorityDropdownOpen.value = false
+  }
+
+  async function searchCreateTaskAssignees(query: string) {
+    if (createTaskAssigneeDebounceTimer.value) {
+      clearTimeout(createTaskAssigneeDebounceTimer.value)
+    }
+
+    createTaskAssigneeDebounceTimer.value = setTimeout(async() => {
+      try {
+        createTaskAssigneeLoading.value = true
+        const response = await adminService.getMembers(10, 1, query || undefined)
+        createTaskAssigneeResults.value = response.members || []
+      } catch(error_) {
+        console.error('Failed to search create task assignees:', error_)
+        createTaskAssigneeResults.value = []
+      } finally {
+        createTaskAssigneeLoading.value = false
+      }
+    }, 300)
+  }
+
+  function selectCreateTaskAssignee(member: MemberSummary) {
+    newTaskForm.value.assignee = member.id
+    createTaskAssigneeSearch.value = member.username
+    isCreateTaskAssigneeDropdownOpen.value = false
+  }
+
+  function clearCreateTaskAssignee() {
+    newTaskForm.value.assignee = ''
+    createTaskAssigneeSearch.value = ''
+    isCreateTaskAssigneeDropdownOpen.value = false
+  }
+
+  function closeCreateTaskAssigneeDropdown() {
+    isCreateTaskAssigneeDropdownOpen.value = false
+    createTaskAssigneeSearch.value = ''
   }
 
   function closeAssigneeDropdown() {
@@ -699,6 +751,9 @@
   })
 
   onBeforeUnmount(() => {
+    if (createTaskAssigneeDebounceTimer.value) {
+      clearTimeout(createTaskAssigneeDebounceTimer.value)
+    }
     if (descriptionSaveDebounceTimer.value) {
       clearTimeout(descriptionSaveDebounceTimer.value)
     }
@@ -1121,13 +1176,48 @@
 
                 <label class="task-field-label" for="task-assignee">Assignee</label>
 
-                <input
-                  id="task-assignee"
-                  v-model="newTaskForm.assignee"
-                  class="task-field"
-                  placeholder="Assignee name"
-                  type="text"
-                >
+                <div class="assignee-combobox">
+                  <input
+                    id="task-assignee"
+                    class="assignee-input"
+                    :placeholder="newTaskForm.assignee ? (members.find(m => m.id === newTaskForm.assignee || m.username === newTaskForm.assignee)?.username || 'Unassigned') : 'Unassigned'"
+                    type="text"
+                    :value="createTaskAssigneeSearch"
+                    @blur="closeCreateTaskAssigneeDropdown()"
+                    @focus="isCreateTaskAssigneeDropdownOpen = true; if (!createTaskAssigneeSearch) { createTaskAssigneeResults = members.slice(0, 10) }"
+                    @input="createTaskAssigneeSearch = ($event.target as HTMLInputElement).value; searchCreateTaskAssignees(createTaskAssigneeSearch)"
+                  >
+
+                  <div v-if="isCreateTaskAssigneeDropdownOpen" class="assignee-dropdown">
+                    <div v-if="createTaskAssigneeLoading" class="assignee-loading">
+                      Searching...
+                    </div>
+
+                    <template v-else>
+                      <div
+                        id="create-task-assignee-none"
+                        class="assignee-option"
+                        @mousedown.prevent="clearCreateTaskAssignee()"
+                      >
+                        Unassigned
+                      </div>
+
+                      <div
+                        v-for="member in filteredCreateTaskAssignees"
+                        :id="`create-task-assignee-${member.id}`"
+                        :key="member.id"
+                        class="assignee-option"
+                        @mousedown.prevent="selectCreateTaskAssignee(member)"
+                      >
+                        {{ member.username }}
+                      </div>
+
+                      <div v-if="filteredCreateTaskAssignees.length === 0 && createTaskAssigneeSearch" class="assignee-empty">
+                        No members found
+                      </div>
+                    </template>
+                  </div>
+                </div>
 
                 <label class="task-field-label" for="task-due-date">Due Date (optional)</label>
 
