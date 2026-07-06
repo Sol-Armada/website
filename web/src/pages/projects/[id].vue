@@ -10,7 +10,6 @@
   } from '@/services/adminService'
   import StarterKit from '@tiptap/starter-kit'
   import { EditorContent, useEditor } from '@tiptap/vue-3'
-  import { Select } from '@vuetify/v0'
   import MarkdownIt from 'markdown-it'
   import { MdEditor } from 'md-editor-v3'
   import TurndownService from 'turndown'
@@ -51,6 +50,8 @@
   const isAssigneeDropdownOpen = ref(false)
   const isStatusSelectOpen = ref(false)
   const isPrioritySelectOpen = ref(false)
+  const isCreateTaskStatusDropdownOpen = ref(false)
+  const isCreateTaskPriorityDropdownOpen = ref(false)
   const isNewTaskModalOpen = ref(false)
   const isTaskDetailModalOpen = ref(false)
   const selectedTaskId = ref<string | null>(null)
@@ -436,12 +437,26 @@
       status: columns.value.length > 0 ? columns.value[0].id : 'To Do' as KanbanStatus,
     }
     titleValidationError.value = null
+    isCreateTaskStatusDropdownOpen.value = false
+    isCreateTaskPriorityDropdownOpen.value = false
     isNewTaskModalOpen.value = true
   }
 
   function closeNewTaskModal() {
     titleValidationError.value = null
+    isCreateTaskStatusDropdownOpen.value = false
+    isCreateTaskPriorityDropdownOpen.value = false
     isNewTaskModalOpen.value = false
+  }
+
+  function selectCreateTaskStatus(status: KanbanStatus) {
+    newTaskForm.value.status = status
+    isCreateTaskStatusDropdownOpen.value = false
+  }
+
+  function selectCreateTaskPriority(priority: TaskPriority) {
+    newTaskForm.value.priority = priority
+    isCreateTaskPriorityDropdownOpen.value = false
   }
 
   function closeAssigneeDropdown() {
@@ -1046,67 +1061,61 @@
                   <div>
                     <label class="task-field-label" for="task-status">Status</label>
 
-                    <Select.Root v-model="newTaskForm.status">
-                      <Select.Activator id="task-status" class="task-select-trigger">
-                        <Select.Value v-slot="{ selectedValue }">
-                          <span>{{ getStatusDisplayLabel(selectedValue) }}</span>
-                        </Select.Value>
+                    <div class="assignee-combobox">
+                      <button
+                        id="task-status"
+                        class="task-select-trigger"
+                        type="button"
+                        @blur="isCreateTaskStatusDropdownOpen = false"
+                        @focus="isCreateTaskStatusDropdownOpen = true"
+                      >
+                        <span>{{ getStatusDisplayLabel(newTaskForm.status) }}</span>
+                        <span class="task-select-chevron">⌄</span>
+                      </button>
 
-                        <Select.Placeholder>
-                          <span>{{ columns.length > 0 ? columns[0].label : 'To Do' }}</span>
-                        </Select.Placeholder>
-
-                        <Select.Cue class="task-select-chevron">
-                          ⌄
-                        </Select.Cue>
-                      </Select.Activator>
-
-                      <Select.Content class="task-select-menu">
-                        <Select.Item
+                      <div v-if="isCreateTaskStatusDropdownOpen" class="task-select-menu">
+                        <div
                           v-for="column in columns"
                           :id="`status-${column.id}`"
                           :key="column.id"
-                          v-slot="{ attrs }"
-                          :value="column.id"
+                          class="task-select-option"
+                          @mousedown.prevent="selectCreateTaskStatus(column.id)"
                         >
-                          <div v-bind="attrs" class="task-select-option">{{ column.label }}</div>
-                        </Select.Item>
-                      </Select.Content>
-                    </Select.Root>
+                          {{ column.label }}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
                     <label class="task-field-label" for="task-priority">Priority</label>
 
-                    <Select.Root v-model="newTaskForm.priority">
-                      <Select.Activator id="task-priority" class="task-select-trigger">
-                        <Select.Value v-slot="{ selectedValue }">
-                          <span>{{ getPriorityDisplayLabel(selectedValue) }}</span>
-                        </Select.Value>
+                    <div class="assignee-combobox">
+                      <button
+                        id="task-priority"
+                        class="task-select-trigger"
+                        type="button"
+                        @blur="isCreateTaskPriorityDropdownOpen = false"
+                        @focus="isCreateTaskPriorityDropdownOpen = true"
+                      >
+                        <span>{{ getPriorityDisplayLabel(newTaskForm.priority) }}</span>
+                        <span class="task-select-chevron">⌄</span>
+                      </button>
 
-                        <Select.Placeholder>
-                          <span>Medium</span>
-                        </Select.Placeholder>
+                      <div v-if="isCreateTaskPriorityDropdownOpen" class="task-select-menu">
+                        <div id="priority-low" class="task-select-option" @mousedown.prevent="selectCreateTaskPriority(0)">
+                          Low
+                        </div>
 
-                        <Select.Cue class="task-select-chevron">
-                          ⌄
-                        </Select.Cue>
-                      </Select.Activator>
+                        <div id="priority-medium" class="task-select-option" @mousedown.prevent="selectCreateTaskPriority(1)">
+                          Medium
+                        </div>
 
-                      <Select.Content class="task-select-menu">
-                        <Select.Item id="priority-low" v-slot="{ attrs }" :value="0">
-                          <div v-bind="attrs" class="task-select-option">Low</div>
-                        </Select.Item>
-
-                        <Select.Item id="priority-medium" v-slot="{ attrs }" :value="1">
-                          <div v-bind="attrs" class="task-select-option">Medium</div>
-                        </Select.Item>
-
-                        <Select.Item id="priority-high" v-slot="{ attrs }" :value="2">
-                          <div v-bind="attrs" class="task-select-option">High</div>
-                        </Select.Item>
-                      </Select.Content>
-                    </Select.Root>
+                        <div id="priority-high" class="task-select-option" @mousedown.prevent="selectCreateTaskPriority(2)">
+                          High
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1692,10 +1701,11 @@
   }
 
   .task-select-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
     z-index: 80;
-    margin-top: 0.25rem;
-    inline-size: anchor-size(width);
-    min-inline-size: anchor-size(width);
     max-height: 14rem;
     border: 1px solid color-mix(in srgb, var(--v0-divider) 70%, transparent);
     border-radius: 0.5rem;
