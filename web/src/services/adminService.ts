@@ -491,18 +491,18 @@ export const adminService = {
   },
 
   async getAvailableAttendanceNames(): Promise<string[]> {
-    return requestJson<string[]>('/api/admin/attendance-names')
+    return requestJson<string[]>('/api/admin/attendance/names')
   },
 
   async createAttendanceName(payload: AttendanceNameMutationRequest): Promise<{ name: string }> {
-    return requestJson<{ name: string }>('/api/admin/attendance-names', {
+    return requestJson<{ name: string }>('/api/admin/attendance/names', {
       method: 'POST',
       body: JSON.stringify(payload),
     })
   },
 
   async deleteAttendanceName(payload: AttendanceNameMutationRequest): Promise<{ name: string }> {
-    return requestJson<{ name: string }>('/api/admin/attendance-names', {
+    return requestJson<{ name: string }>('/api/admin/attendance/names', {
       method: 'DELETE',
       body: JSON.stringify(payload),
     })

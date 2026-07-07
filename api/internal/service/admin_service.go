@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"log/slog"
-
 	"github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/tokens"
@@ -122,15 +120,11 @@ type UpdateAttendanceRecordInput struct {
 	OnTimeParticipantIds []string `json:"onTimeParticipantIds"`
 }
 
-type AdminService struct {
-	logger *slog.Logger
-}
+var (
+	ErrMemberNotFound error = errors.New("member not found")
+)
 
-func NewAdminService(logger *slog.Logger) *AdminService {
-	return &AdminService{logger: logger}
-}
-
-func (s *AdminService) GetOverviewStats(_ context.Context) (*AdminOverviewStats, error) {
+func GetOverviewStats(_ context.Context) (*AdminOverviewStats, error) {
 	// Get all attendance records to count events
 	allAttendance, err := attendance.List(10000, 0)
 	if err != nil {
@@ -183,7 +177,7 @@ func (s *AdminService) GetOverviewStats(_ context.Context) (*AdminOverviewStats,
 	}, nil
 }
 
-func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int, search string) ([]AttendanceRecord, error) {
+func GetAttendanceRecords(_ context.Context, limit, page int, search string) ([]AttendanceRecord, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -251,7 +245,7 @@ func (s *AdminService) GetAttendanceRecords(_ context.Context, limit, page int, 
 	return result, nil
 }
 
-func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search string) ([]TokenTransaction, error) {
+func GetTokenLedger(_ context.Context, limit, page int, search string) ([]TokenTransaction, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -365,7 +359,7 @@ func (s *AdminService) GetTokenLedger(_ context.Context, limit, page int, search
 	return paginateTokenTransactions(result, limit, page), nil
 }
 
-func (s *AdminService) GetTokenLedgerAnalytics(_ context.Context) (*TokenLedgerAnalytics, error) {
+func GetTokenLedgerAnalytics(_ context.Context) (*TokenLedgerAnalytics, error) {
 	allTokens, err := tokens.GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token records for analytics: %w", err)
@@ -382,7 +376,7 @@ func (s *AdminService) GetTokenLedgerAnalytics(_ context.Context) (*TokenLedgerA
 	}, nil
 }
 
-func (s *AdminService) GetAttendanceAnalytics(_ context.Context) (*AttendanceAnalytics, error) {
+func GetAttendanceAnalytics(_ context.Context) (*AttendanceAnalytics, error) {
 	allAttendance, err := attendance.List(10000, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch attendance records for analytics: %w", err)
@@ -563,7 +557,7 @@ func calculateReasonAggregation(allTokens []tokens.TokenRecord) []TokenReasonAgg
 	return result
 }
 
-func (s *AdminService) GetMembers(ctx context.Context, limit, page int, search string) ([]MemberSummary, error) {
+func GetMembers(ctx context.Context, limit, page int, search string) ([]MemberSummary, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -625,7 +619,7 @@ func (s *AdminService) GetMembers(ctx context.Context, limit, page int, search s
 	return result, nil
 }
 
-func (s *AdminService) GetMembersByIds(ctx context.Context, ids []string) (map[string]MemberSummary, error) {
+func GetMembersByIds(ctx context.Context, ids []string) (map[string]MemberSummary, error) {
 	members, err := members.GetList(ids)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch members by ids: %w", err)
@@ -640,7 +634,7 @@ func (s *AdminService) GetMembersByIds(ctx context.Context, ids []string) (map[s
 	return result, nil
 }
 
-func (s *AdminService) GetMemberSummaryByID(_ context.Context, memberID string) (*MemberSummary, error) {
+func GetMemberSummaryByID(_ context.Context, memberID string) (*MemberSummary, error) {
 	if strings.TrimSpace(memberID) == "" {
 		return nil, nil
 	}
@@ -675,7 +669,7 @@ type CreateAttendanceRecordInput struct {
 	AwardTokens    bool     `json:"awardTokens"`
 }
 
-func (s *AdminService) CreateAttendanceRecord(ctx context.Context, input CreateAttendanceRecordInput) error {
+func CreateAttendanceRecord(ctx context.Context, input CreateAttendanceRecordInput) error {
 	allMembers := make(map[string]*members.Member)
 	for _, id := range input.ParticipantIds {
 		allMembers[id] = nil
@@ -710,28 +704,28 @@ func (s *AdminService) CreateAttendanceRecord(ctx context.Context, input CreateA
 		if member, ok := allMembers[participantId]; ok && member != nil {
 			err = newAttendance.AddParticipant(member)
 			if err != nil {
-				s.logger.Error("Failed to add participant to attendance record", "memberId", participantId, "error", err)
+				return err
 			}
 			continue
 		}
-		s.logger.Warn("Participant ID not found in members list", "memberId", participantId)
+		return errors.Join(err, ErrMemberNotFound)
 	}
 
 	for _, managerId := range input.ManagerIds {
 		if member, ok := allMembers[managerId]; ok && member != nil {
 			err = newAttendance.SetParticipantManager(managerId)
 			if err != nil {
-				s.logger.Error("Failed to add manager to attendance record", "memberId", managerId, "error", err)
+				return err
 			}
 			continue
 		}
-		s.logger.Warn("Manager ID not found in members list", "memberId", managerId)
+		return errors.Join(err, ErrMemberNotFound)
 	}
 
 	return nil
 }
 
-func (s *AdminService) GetAttendanceRecord(ctx context.Context, attendanceID string) (*AttendanceRecord, error) {
+func GetAttendanceRecord(ctx context.Context, attendanceID string) (*AttendanceRecord, error) {
 	if strings.TrimSpace(attendanceID) == "" {
 		return nil, nil
 	}
@@ -769,7 +763,7 @@ func (s *AdminService) GetAttendanceRecord(ctx context.Context, attendanceID str
 	return record, nil
 }
 
-func (s *AdminService) GetMembersByAttendance(ctx context.Context, attendanceID string) ([]MemberSummary, error) {
+func GetMembersByAttendance(ctx context.Context, attendanceID string) ([]MemberSummary, error) {
 	if strings.TrimSpace(attendanceID) == "" {
 		return nil, nil
 	}
@@ -804,8 +798,8 @@ func (s *AdminService) GetMembersByAttendance(ctx context.Context, attendanceID 
 	return result, nil
 }
 
-func (s *AdminService) GetAttendanceEditPayload(ctx context.Context, attendanceID string) (*AttendanceEditPayload, error) {
-	record, err := s.GetAttendanceRecord(ctx, attendanceID)
+func GetAttendanceEditPayload(ctx context.Context, attendanceID string) (*AttendanceEditPayload, error) {
+	record, err := GetAttendanceRecord(ctx, attendanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -813,7 +807,7 @@ func (s *AdminService) GetAttendanceEditPayload(ctx context.Context, attendanceI
 		return nil, nil
 	}
 
-	participants, err := s.GetMembersByAttendance(ctx, attendanceID)
+	participants, err := GetMembersByAttendance(ctx, attendanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -824,7 +818,7 @@ func (s *AdminService) GetAttendanceEditPayload(ctx context.Context, attendanceI
 	}, nil
 }
 
-func (s *AdminService) UpdateAttendanceRecord(ctx context.Context, attendanceID string, input UpdateAttendanceRecordInput) error {
+func UpdateAttendanceRecord(ctx context.Context, attendanceID string, input UpdateAttendanceRecordInput) error {
 	if strings.TrimSpace(attendanceID) == "" {
 		return fmt.Errorf("%w: attendance ID is required", ErrInvalidAttendanceInput)
 	}

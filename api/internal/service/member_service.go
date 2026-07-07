@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"log/slog"
-
 	"github.com/sol-armada/sol-bot/attendance"
 	"github.com/sol-armada/sol-bot/members"
 	"github.com/sol-armada/sol-bot/projects"
@@ -66,15 +64,7 @@ type MemberProfileData struct {
 	Validated       bool     `json:"validated"`
 }
 
-type MemberService struct {
-	logger *slog.Logger
-}
-
-func NewMemberService(logger *slog.Logger) *MemberService {
-	return &MemberService{logger: logger}
-}
-
-func (s *MemberService) GetDashboard(memberID string) (*MemberDashboardData, error) {
+func GetDashboard(memberID string) (*MemberDashboardData, error) {
 	attendanceCount, err := attendance.GetMemberAttendanceCount(memberID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load attendance count: %w", err)
@@ -97,16 +87,14 @@ func (s *MemberService) GetDashboard(memberID string) (*MemberDashboardData, err
 		}
 	}
 
-	recentActivity, err := s.getRecentTokenActivity(memberID)
+	recentActivity, err := getRecentTokenActivity(memberID)
 	if err != nil {
-		s.logger.Warn("Failed to load recent token activity", "error", err, "member_id", memberID)
-		recentActivity = []MemberActivity{}
+		return nil, fmt.Errorf("failed to load recent token activity: %w", err)
 	}
 
 	tokenRecords, err := tokens.ListByMemberId(memberID)
 	if err != nil {
-		s.logger.Warn("Failed to load token ledger", "error", err, "member_id", memberID)
-		tokenRecords = []tokens.TokenRecord{}
+		return nil, fmt.Errorf("failed to load token ledger: %w", err)
 	}
 
 	// Transform token records into TokenTransaction format
@@ -125,8 +113,7 @@ func (s *MemberService) GetDashboard(memberID string) (*MemberDashboardData, err
 		}
 		atts, err := attendance.ListByIds(idSlice)
 		if err != nil {
-			s.logger.Warn("Failed to load attendance details", "error", err, "member_id", memberID)
-			atts = []*attendance.Attendance{}
+			return nil, fmt.Errorf("failed to load attendance details: %w", err)
 		}
 		attendanceMap = make(map[string]*attendance.Attendance)
 		for _, att := range atts {
@@ -178,7 +165,7 @@ func (s *MemberService) GetDashboard(memberID string) (*MemberDashboardData, err
 	}, nil
 }
 
-func (s *MemberService) GetProfile(memberID, fallbackUsername, fallbackEmail string, roles []string) (*MemberProfileData, error) {
+func GetProfile(memberID, fallbackUsername, fallbackEmail string, roles []string) (*MemberProfileData, error) {
 	attendanceCount, err := attendance.GetMemberAttendanceCount(memberID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load attendance count: %w", err)
@@ -228,7 +215,7 @@ func (s *MemberService) GetProfile(memberID, fallbackUsername, fallbackEmail str
 	return result, nil
 }
 
-func (s *MemberService) GetTokenLedger(memberID string, limit, page int) (*PaginatedResponse, error) {
+func GetMemberTokenLedger(memberID string, limit, page int) (*PaginatedResponse, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -257,7 +244,7 @@ func (s *MemberService) GetTokenLedger(memberID string, limit, page int) (*Pagin
 		}
 		atts, err := attendance.ListByIds(idSlice)
 		if err != nil {
-			s.logger.Warn("Failed to load attendance details", "error", err, "member_id", memberID)
+			return nil, fmt.Errorf("failed to load attendance details: %w", err)
 		}
 		for _, att := range atts {
 			attendanceMap[att.Id] = att
@@ -322,7 +309,7 @@ func (s *MemberService) GetTokenLedger(memberID string, limit, page int) (*Pagin
 	}, nil
 }
 
-func (s *MemberService) getRecentTokenActivity(memberID string) ([]MemberActivity, error) {
+func getRecentTokenActivity(memberID string) ([]MemberActivity, error) {
 	records, err := tokens.GetAll()
 	if err != nil {
 		return nil, err

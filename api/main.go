@@ -137,19 +137,10 @@ func main() {
 
 	// Initialize services
 	sessionService := service.NewSessionService(sessionStorage, log)
-	memberService := service.NewMemberService(log)
-	adminService := service.NewAdminService(log)
-	configService := service.NewConfigService(log)
 
-	// Wrap admin service with caching if Redis is available
-	var adminServiceInterface handlers.AdminServiceInterface = adminService
-
-	if redisCache != nil {
-		cachedAdminService := service.NewCachedAdminService(adminService, redisCache, log)
-		adminServiceInterface = cachedAdminService
-		log.Info("Admin service caching enabled")
-	} else {
-		log.Warn("Admin service caching disabled")
+	if err := service.SetupConfigService(); err != nil {
+		log.Error("Failed to setup config service", "error", err)
+		os.Exit(1)
 	}
 
 	// Initialize auth services
@@ -178,8 +169,7 @@ func main() {
 		cfg.Roles.ModeratorRoleID,
 		log,
 	)
-	memberHandler := handlers.NewMemberHandler(memberService, log)
-	adminHandler := handlers.NewAdminHandler(adminServiceInterface, configService, log)
+	apiHandler := handlers.NewHandler(log)
 	wsHub := realtime.NewHub(log, version)
 	go wsHub.RunHealthHeartbeat(20 * time.Second)
 	wsHandler := handlers.NewWebSocketHandler(wsHub, log)
@@ -226,7 +216,7 @@ func main() {
 
 				operation := strings.ToLower(string(event.Operation))
 				if operation != "delete" && memberID != "" {
-					memberSummary, memberErr := adminService.GetMemberSummaryByID(notifyCtx, memberID)
+					memberSummary, memberErr := service.GetMemberSummaryByID(notifyCtx, memberID)
 					if memberErr != nil {
 						log.Debug("failed to enrich member ws payload", "member_id", memberID, "error", memberErr)
 					} else if memberSummary != nil {
@@ -326,38 +316,34 @@ func main() {
 	api.Use(apiRateLimiter.Middleware())
 
 	memberAPI := api.Group("/member")
-	memberAPI.GET("/dashboard", memberHandler.GetDashboard)
-	memberAPI.GET("/profile", memberHandler.GetProfile)
-	memberAPI.GET("/token-ledger", memberHandler.GetTokenLedger)
+	memberAPI.GET("/dashboard", apiHandler.GetDashboard)
+	memberAPI.GET("/profile", apiHandler.GetProfile)
+	memberAPI.GET("/token-ledger", apiHandler.GetMemberTokenLedger)
 
 	adminAPI := api.Group("/admin")
 	adminAPI.Use(appMiddleware.RequireAdmin)
-	adminAPI.GET("/projects", adminHandler.ListProjects)
-	adminAPI.POST("/projects", adminHandler.CreateProject)
-	adminAPI.GET("/projects/:id/task-statuses", adminHandler.ListProjectTaskStatuses)
-	adminAPI.GET("/projects/:id/tasks", adminHandler.ListProjectTasks)
-	adminAPI.POST("/projects/:id/tasks", adminHandler.CreateProjectTask)
-	adminAPI.PATCH("/projects/:id/tasks/:taskId", adminHandler.UpdateProjectTask)
-	adminAPI.DELETE("/projects/:id/tasks/:taskId", adminHandler.DeleteProjectTask)
-	adminAPI.GET("/projects/:id/tickets", adminHandler.ListProjectTasks)
-	adminAPI.POST("/projects/:id/tickets", adminHandler.CreateProjectTask)
-	adminAPI.PATCH("/projects/:id/tickets/:ticketId", adminHandler.UpdateProjectTask)
-	adminAPI.DELETE("/projects/:id/tickets/:ticketId", adminHandler.DeleteProjectTask)
-	adminAPI.GET("/project-statuses", adminHandler.ListProjectStatuses)
-	adminAPI.GET("/overview", adminHandler.GetOverview)
-	adminAPI.GET("/attendance", adminHandler.GetAttendance)
-	adminAPI.GET("/attendance/analytics", adminHandler.GetAttendanceAnalytics)
-	adminAPI.GET("/token-ledger", adminHandler.GetTokenLedger)
-	adminAPI.GET("/token-ledger/analytics", adminHandler.GetTokenLedgerAnalytics)
-	adminAPI.GET("/members", adminHandler.GetMembers)
-	adminAPI.GET("/attendance-names", adminHandler.GetAvailableAttendanceNames)
-	adminAPI.POST("/attendance-names", adminHandler.CreateAttendanceName)
-	adminAPI.DELETE("/attendance-names", adminHandler.DeleteAttendanceName)
-	adminAPI.POST("/attendance", adminHandler.CreateAttendanceRecord)
-	adminAPI.GET("/attendance/:id", adminHandler.GetAttendanceRecord)
-	adminAPI.GET("/attendance/:id/edit", adminHandler.GetAttendanceEditPayload)
-	adminAPI.PATCH("/attendance/:id", adminHandler.UpdateAttendanceRecord)
-	adminAPI.GET("/attendance/:id/members", adminHandler.GetMembersByAttendance)
+	adminAPI.GET("/projects", apiHandler.ListProjects)
+	adminAPI.POST("/projects", apiHandler.CreateProject)
+	adminAPI.GET("/projects/:id/task-statuses", apiHandler.ListTaskStatuses)
+	adminAPI.GET("/projects/:id/tasks", apiHandler.ListTasks)
+	adminAPI.POST("/projects/:id/tasks", apiHandler.CreateTask)
+	adminAPI.PATCH("/projects/:id/tasks/:taskId", apiHandler.UpdateTask)
+	adminAPI.DELETE("/projects/:id/tasks/:taskId", apiHandler.DeleteTask)
+	adminAPI.GET("/project-statuses", apiHandler.ListProjectStatuses)
+	adminAPI.GET("/overview", apiHandler.GetOverview)
+	adminAPI.GET("/attendance", apiHandler.GetAttendance)
+	adminAPI.GET("/attendance/analytics", apiHandler.GetAttendanceAnalytics)
+	adminAPI.GET("/token-ledger", apiHandler.GetTokenLedger)
+	adminAPI.GET("/token-ledger/analytics", apiHandler.GetTokenLedgerAnalytics)
+	adminAPI.GET("/members", apiHandler.GetMembers)
+	adminAPI.GET("/attendance/names", apiHandler.GetAttendanceNames)
+	adminAPI.POST("/attendance/names", apiHandler.CreateAttendanceName)
+	adminAPI.DELETE("/attendance/names", apiHandler.DeleteAttendanceName)
+	adminAPI.POST("/attendance", apiHandler.CreateAttendanceRecord)
+	adminAPI.GET("/attendance/:id", apiHandler.GetAttendanceRecord)
+	adminAPI.GET("/attendance/:id/edit", apiHandler.GetAttendanceEditPayload)
+	adminAPI.PATCH("/attendance/:id", apiHandler.UpdateAttendanceRecord)
+	adminAPI.GET("/attendance/:id/members", apiHandler.GetMembersByAttendance)
 
 	// WebSocket endpoint
 	api.GET("/ws", wsHandler.Handle)

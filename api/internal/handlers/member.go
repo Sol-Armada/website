@@ -4,27 +4,13 @@ import (
 	"net/http"
 	"strconv"
 
-	"log/slog"
-
 	"github.com/labstack/echo/v4"
 
 	"github.com/sol-armada/website/internal/dto"
 	"github.com/sol-armada/website/internal/service"
 )
 
-type MemberHandler struct {
-	memberService *service.MemberService
-	logger        *slog.Logger
-}
-
-func NewMemberHandler(memberService *service.MemberService, logger *slog.Logger) *MemberHandler {
-	return &MemberHandler{
-		memberService: memberService,
-		logger:        logger,
-	}
-}
-
-func (h *MemberHandler) GetDashboard(c echo.Context) error {
+func (h *Handler) GetDashboard(c echo.Context) error {
 	memberID, _ := c.Get("user_id").(string)
 	if memberID == "" {
 		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
@@ -33,7 +19,7 @@ func (h *MemberHandler) GetDashboard(c echo.Context) error {
 		})
 	}
 
-	result, err := h.memberService.GetDashboard(memberID)
+	result, err := service.GetDashboard(memberID)
 	if err != nil {
 		h.logger.Error("Failed to fetch member dashboard", "error", err, "member_id", memberID)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -45,7 +31,7 @@ func (h *MemberHandler) GetDashboard(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
-func (h *MemberHandler) GetProfile(c echo.Context) error {
+func (h *Handler) GetProfile(c echo.Context) error {
 	memberID, _ := c.Get("user_id").(string)
 	if memberID == "" {
 		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
@@ -58,7 +44,7 @@ func (h *MemberHandler) GetProfile(c echo.Context) error {
 	email, _ := c.Get("email").(string)
 	roles, _ := c.Get("roles").([]string)
 
-	result, err := h.memberService.GetProfile(memberID, username, email, roles)
+	result, err := service.GetProfile(memberID, username, email, roles)
 	if err != nil {
 		h.logger.Error("Failed to fetch member profile", "error", err, "member_id", memberID)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -70,7 +56,7 @@ func (h *MemberHandler) GetProfile(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
-func (h *MemberHandler) GetTokenLedger(c echo.Context) error {
+func (h *Handler) GetMemberTokenLedger(c echo.Context) error {
 	memberID, _ := c.Get("user_id").(string)
 	if memberID == "" {
 		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
@@ -93,7 +79,7 @@ func (h *MemberHandler) GetTokenLedger(c echo.Context) error {
 		}
 	}
 
-	result, err := h.memberService.GetTokenLedger(memberID, limit, page)
+	result, err := service.GetMemberTokenLedger(memberID, limit, page)
 	if err != nil {
 		h.logger.Error("Failed to fetch member token ledger", "error", err, "member_id", memberID)
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
