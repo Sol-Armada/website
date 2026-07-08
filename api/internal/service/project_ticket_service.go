@@ -78,17 +78,13 @@ func CreateProjectTask(ctx context.Context, projectId uuid.UUID, performedById s
 		}
 	}
 
-	var parentTaskId *uuid.UUID
+	var parentTaskId *string
 	if input.ParentTaskId != nil && strings.TrimSpace(*input.ParentTaskId) != "" {
-		parsedParentTaskId, err := uuid.Parse(strings.TrimSpace(*input.ParentTaskId))
-		if err != nil {
-			return nil, fmt.Errorf("invalid parent task ID format: %w", err)
-		}
-		parentTaskId = &parsedParentTaskId
+		parentTaskId = input.ParentTaskId
 	}
 
 	var parentTask *projects.Task
-	if parentTaskId != nil && *parentTaskId != uuid.Nil {
+	if parentTaskId != nil && *parentTaskId != "" {
 		parentTask, err = projects.GetTask(ctx, *parentTaskId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch parent task: %w", err)

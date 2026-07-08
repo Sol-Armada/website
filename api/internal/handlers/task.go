@@ -18,13 +18,13 @@ import (
 	"github.com/sol-armada/website/internal/service"
 )
 
-func (h *Handler) listTaskActivity(ctx context.Context, taskID uuid.UUID) ([]taskActivityResponse, error) {
+func (h *Handler) listTaskActivity(ctx context.Context, taskID string) ([]taskActivityResponse, error) {
 	db := database.Get()
 	if db == nil {
 		return nil, errors.New("database not initialized")
 	}
 
-	history, err := db.Queries.ListTaskHistory(ctx, taskID.String())
+	history, err := db.Queries.ListTaskHistory(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (h *Handler) listTaskActivity(ctx context.Context, taskID uuid.UUID) ([]tas
 
 		var details map[string]any
 		if err := json.Unmarshal(entry.Details, &details); err != nil {
-			h.logger.Warn("Failed to parse task history details", "taskId", taskID.String(), "historyId", entry.ID, "error", err)
+			h.logger.Warn("Failed to parse task history details", "taskId", taskID, "historyId", entry.ID, "error", err)
 			continue
 		}
 
@@ -71,7 +71,7 @@ func (h *Handler) taskWithActivity(ctx context.Context, task *projects.Task) tas
 
 	activity, err := h.listTaskActivity(ctx, task.Id)
 	if err != nil {
-		h.logger.Warn("Failed to list task activity", "taskId", task.Id.String(), "error", err)
+		h.logger.Warn("Failed to list task activity", "taskId", task.Id, "error", err)
 		return response
 	}
 
@@ -181,19 +181,9 @@ func (h *Handler) UpdateTask(c echo.Context) error {
 		}
 	}
 
-	var taskId uuid.UUID
-	if taskIdStr := strings.TrimSpace(c.Param("taskId")); taskIdStr != "" {
-		var err error
-		taskId, err = uuid.Parse(taskIdStr)
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-				Error:   "invalid_request",
-				Message: "Invalid task Id",
-			})
-		}
-	}
+	taskId := strings.TrimSpace(c.Param("taskId"))
 
-	if projectId == uuid.Nil || taskId == uuid.Nil {
+	if projectId == uuid.Nil || taskId == "" {
 		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Project Id and task Id are required",
@@ -263,20 +253,13 @@ func (h *Handler) UpdateTask(c echo.Context) error {
 		})
 	}
 
-	var parentTaskId *uuid.UUID
+	var parentTaskId *string
 	if req.ParentTaskId != nil && *req.ParentTaskId != "" {
-		parsedParentTaskId, err := uuid.Parse(*req.ParentTaskId)
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-				Error:   "invalid_request",
-				Message: "Invalid parent task Id",
-			})
-		}
-		parentTaskId = &parsedParentTaskId
+		parentTaskId = req.ParentTaskId
 	}
 
 	var parentTask *projects.Task
-	if parentTaskId != nil && *parentTaskId != uuid.Nil {
+	if parentTaskId != nil && *parentTaskId != "" {
 		parentTask, err = projects.GetTask(c.Request().Context(), *parentTaskId)
 		if err != nil {
 			if errors.Is(err, projects.ErrTaskNotFound) {
@@ -313,7 +296,8 @@ func (h *Handler) UpdateTask(c echo.Context) error {
 }
 
 func (h *Handler) DeleteTask(c echo.Context) error {
-	var projectId, taskId uuid.UUID
+	var projectId uuid.UUID
+	var taskId string
 	if projectIdStr := strings.TrimSpace(c.Param("id")); projectIdStr != "" {
 		var err error
 		projectId, err = uuid.Parse(projectIdStr)
@@ -325,29 +309,15 @@ func (h *Handler) DeleteTask(c echo.Context) error {
 		}
 	}
 	if taskIdStr := strings.TrimSpace(c.Param("taskId")); taskIdStr != "" {
-		var err error
-		taskId, err = uuid.Parse(taskIdStr)
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-				Error:   "invalid_request",
-				Message: "Invalid task Id",
-			})
-		}
+		taskId = taskIdStr
 	}
-	if taskId == uuid.Nil {
+	if taskId == "" {
 		if taskIdStr := strings.TrimSpace(c.Param("ticketId")); taskIdStr != "" {
-			var err error
-			taskId, err = uuid.Parse(taskIdStr)
-			if err != nil {
-				return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-					Error:   "invalid_request",
-					Message: "Invalid task Id",
-				})
-			}
+			taskId = taskIdStr
 		}
 	}
 
-	if projectId == uuid.Nil || taskId == uuid.Nil {
+	if projectId == uuid.Nil || taskId == "" {
 		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error:   "invalid_request",
 			Message: "Project Id and task Id are required",
